@@ -23,7 +23,8 @@ spec:
     cleanupOnFail: true
     remediation:
       retries: 3
-      strategy: RetryOnFailure
+    strategy:
+      name: RetryOnFailure
       retryInterval: 5m
   # Values are trimmed for a small 2-node cluster (3 GiB + 1536 MiB).
   # Decision 4 (sizing) resolved 2026-10-15 — see docs/system-inventory.md#memory-budget.
