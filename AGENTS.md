@@ -21,14 +21,20 @@ State changes go in the docs (and `system-inventory.md`), not here.
 
 ## What this project is
 - A 2-node k3s cluster running on libvirt/KVM VMs.
-- Operator tooling (kubectl, helm, kubectl, flux, …) runs **inside a Devpod
+- Operator tooling (kubectl, helm, flux, …) runs **inside a Devpod
   workspace**, not on the host.
 - Everything is documented; the repo doubles as a portfolio piece.
 
 ## Hard constraints (non-negotiable)
-- **FOSS only.** No proprietary components, no vendor lock-in. (Spec filenames
-  `.devcontainer/devcontainer.json` and the `"dockerfile"` key come from the
-  open `containers.dev` standard — keep them; they are not the Docker/VS Code apps.)
+- **FOSS only.** No proprietary components, no vendor lock-in.
+- **FOSS-only naming.** Avoid `docker`, `vscode`, `dev-container`,
+  `mcr.microsoft.com` in anything we name. The mandated spec names
+  (`.devcontainer/devcontainer.json`, the `"dockerfile"` key) come from the open
+  `containers.dev` standard — keep them; they are not the Docker/VS Code apps.
+- **Workspace container:** base image `quay.io/fedora/fedora:44`; runs as the
+  uid-1000 `dev` user.
+- **Host power: TLP only.** `tuned` must remain **absent** — they fight over the
+  CPU governor. See [ADR-0001](docs/adr/0001-tlp-over-tuned.md).
 - **Lightweight & minimal.** Prefer fewer tools and one tool where possible;
   size choices to the small cluster (~3 GiB RAM total).
 - **Host stays "OS free".** Install as little as possible on the host; cluster
@@ -38,6 +44,7 @@ State changes go in the docs (and `system-inventory.md`), not here.
   `kvm` / `vm` shell functions.
 - **NEVER `vm destroy`** — it wipes the disk. Shut down gracefully.
 - **NEVER commit secrets** (tokens, keys, kubeconfigs).
+- **Commit/push only when the user explicitly asks.**
 
 ## Architecture snapshot
 > Authoritative, verified values live in
@@ -52,8 +59,8 @@ State changes go in the docs (and `system-inventory.md`), not here.
 - Guest OS Ubuntu 24.04.5 · k3s `v1.37.1+k3s1` · containerd `2.3.4-k3s1`
 - CNI: **Flannel** (k3s default) · Traefik **disabled**
 - Cluster login user: `ratlab` · Workspace user: `dev` (uid 1000)
-- Ingress: **none yet** (Gateway API CRDs present, no controller) — see
-  [ADR-0004](docs/adr/0004-gateway-api-and-ingress.md)
+- Ingress: **Envoy Gateway** (chosen; not installed yet) — Gateway API CRDs
+  present, no controller. See [ADR-0004](docs/adr/0004-gateway-api-and-ingress.md)
 - Host: Fedora 44 Workstation · kubeconfig at `~/.kube/config` (host)
 
 ## Conventions
@@ -79,6 +86,11 @@ State changes go in the docs (and `system-inventory.md`), not here.
 | `kvm off` before both VMs show `shut off` | wait until `virsh list --all` shows `shut off` |
 | Run `kubectl`-dependent scripts on the host | run them inside the workspace (`devpod ssh`) |
 | Run `ssh` inside a `while read` loop without `-n` | add `-n` |
+| Use the host's `rm` expecting a real delete | the host `rm` is a **trash wrapper** — use `command rm -f` to truly delete |
+| Mount host creds into a rootless-Podman container with one flag | needs **both** `--userns=keep-id` **and** `--security-opt=label=disable` |
+| Use short image names with Podman | use **fully-qualified** names (`quay.io/...`) |
+| Rely on `SHELL` in the `Containerfile` | Podman builds **OCI**; `RUN` uses `/bin/sh` |
+| Install `tuned` on the host | leave it absent (TLP only) |
 | Commit secrets | keep them out; extend `.gitignore` |
 | Duplicate doc content into this file | point to the doc |
 

@@ -4,10 +4,12 @@ Forward plan for the homelab, phase by phase, with the decision points that
 block each phase. This is also the **resume point** for a new session: read the
 [Resume checklist](#resume-checklist) at the bottom.
 
-- **Last updated:** 2026-10-13
+- **Last updated:** 2026-10-14
 - **Done so far:** Phases 0–2 (substrate, k3s cluster, operator workspace, k9s
   single pane) — see [system-inventory.md](system-inventory.md#current-phase-status).
-- **Current focus:** Phase 3 (GitOps) — **blocked on 4 open decisions** below.
+- **Current focus:** Phase 3 (GitOps) — ✅ **decisions resolved**
+  ([below](#resolved-decisions-2026-10-14)); next step is adding
+  `flux`/`sops`/`age` to the workspace.
 
 > Version numbers in this document were researched on 2026-10-13 and **will
 > drift**. Re-verify the exact tag/chart version at implementation time before
@@ -22,8 +24,8 @@ block each phase. This is also the **resume point** for a new session: read the
 | 0 | Substrate (KVM, libvirt, network, VMs, SSH) | ✅ done | — |
 | 1 | k3s cluster (control plane + worker, verified) | ✅ done | — |
 | 2 | Operator workspace (Devpod/Podman) + observability (k9s) | ✅ done | — |
-| **3** | **GitOps foundation (Flux + SOPS/age, ingress, first workload)** | ⏳ next | Open decisions 1–4 |
-| 4 | CNI migration → Cilium (+ Hubble) | ⏳ | Decision 1 (timing) |
+| **3** | **GitOps foundation (Flux + SOPS/age, ingress, first workload)** | ▶️ in progress | — (decisions resolved) |
+| 4 | CNI migration → Cilium (+ Hubble) | 💤 skip for now | Decision 1 → **skip Cilium** |
 | 5 | IaC as code (Terraform libvirt + Ansible) | ⏳ | — |
 | 6 | Observability stack (Prometheus/Grafana/Alertmanager) | ⏳ | Decision 4 (sizing) |
 | 7 | Security hardening (RBAC, NetworkPolicy, PSS) | ⏳ | Phase 4 for NetworkPolicy |
@@ -34,14 +36,18 @@ block each phase. This is also the **resume point** for a new session: read the
 
 ## ⚠️ Sequencing note — do Cilium before GitOps
 
+> **Resolved 2026-10-14:** Cilium is **skipped for now** (keep Flannel) to stay
+> lightweight; the note below is kept for when/if that changes. See
+> [Resolved decisions](#resolved-decisions-2026-10-14).
+
 Phase 4 (Cilium) is effectively a **fresh-install-only** change: it requires k3s
 started with `--flannel-backend=none` (and `--disable-network-policy`), which
 means **reinstalling the control plane**. Doing it now is a trivial redo of
 Phase 1 scripts against an empty cluster. Doing it *after* Phase 3 means tearing
 down a cluster that already holds Flux, age keys, and workloads.
 
-**Recommendation:** run Phase 4 **before** Phase 3 if the goal is the least-risky
-order. See [Open decision 1](#open-decision-1--cilium-timing).
+**If Cilium is ever scheduled:** run Phase 4 **before** Phase 3 for the
+least-risky order.
 
 ---
 
@@ -77,7 +83,11 @@ ingress) can then be delivered as git-managed `HelmRelease`s instead of manual
 
 ---
 
-## Phase 4 — CNI migration to Cilium
+## Phase 4 — CNI migration to Cilium (skipped for now)
+
+> **Status: not planned.** Skipped 2026-10-14 to keep the cluster lightweight
+> (Flannel + k3s's built-in NetworkPolicy controller is enough for a 2-node lab).
+> Revisit as a stretch if RAM grows. Kept here as a documented option.
 
 **Goal:** replace Flannel with Cilium; enable kube-proxy replacement and Hubble.
 
@@ -153,41 +163,24 @@ Phase 5 Terraform is an *alternative* code path, not a change to that tool.
 
 ---
 
-## Open decisions
+## Resolved decisions (2026-10-14)
 
-These block Phase 3. Each has a recommendation; confirm or override.
+Recorded here (in committed docs, not only the private `AGENTS.local.md`) so the
+repo's memory is complete.
 
-### Open decision 1 — Cilium timing
-| Option | Trade-off |
-|---|---|
-| **Before Phase 3 (recommended)** | Reinstall k3s on the empty cluster now; cleanest, ~20 min redo of Phase 1 |
-| After Phase 3 | Gets GitOps value first, but tears down live Flux/secret state later |
-| Skip Cilium | Keep Flannel; lose kube-proxy replacement + Hubble |
-
-### Open decision 2 — Git remote for Flux
-| Option | Trade-off |
-|---|---|
-| **Private GitHub repo** | Easiest, portable, recognized by employers; git is FOSS, GitHub is the host service |
-| Self-hosted Gitea | Strongest "no vendor lock" story; more setup, must be reachable |
-| GitLab (SaaS/self-hosted) | FOSS core, strong CI, middle ground |
-
-> The repo is **not yet a git repository** (initialization intentionally
-> deferred). Flux requires a git remote, so this becomes mandatory to resolve in
-> Phase 3 regardless of host choice.
-
-### Open decision 3 — Ingress / Gateway controller
-Full option table in [ADR-0004](adr/0004-gateway-api-and-ingress.md). Summary:
-| Option | API | Notes |
+| # | Decision | Resolution |
 |---|---|---|
-| **Envoy Gateway (recommended)** | Gateway API | CNCF, full Gateway API v1.2, no CNI change |
-| Cilium Gateway API | Gateway API | Collapses with Phase 4 (one controller for CNI + ingress) |
-| NGINX Gateway Fabric | Gateway API | FOSS Gateway API flavor of NGINX |
-| ingress-nginx | Ingress | Simplest/most docs, but upstream is retiring it and it ignores the installed CRDs |
+| 1 | Cilium timing | **Skip Cilium for now** — keep Flannel (lightweight priority). Revisit as a stretch. |
+| 2 | Git remote for Flux | **Private GitHub** — `wasim-hassan/k8s-homelab-kvm` (git init + push done). |
+| 3 | Ingress / Gateway controller | **Envoy Gateway** (CNCF, Apache-2.0, Gateway API) — [ADR-0004](adr/0004-gateway-api-and-ingress.md) now **Accepted**. |
 
-### Open decision 4 — Observability sizing
-Options in [Phase 6](#phase-6--observability-stack). Choose: bump VM RAM (and to
-what), lightweight in-cluster stack (reduced retention/resources or
-VictoriaMetrics), or defer sizing to when Phase 6 begins.
+The option tables for decisions 1–3 are preserved in git history; the
+resolutions above supersede them.
+
+### Still open — Decision 4 — Observability sizing
+Options in [Phase 6](#phase-6--observability-stack). Decide when Phase 6 begins:
+bump VM RAM (and to what), a lightweight in-cluster stack (reduced
+retention/resources or VictoriaMetrics), or defer.
 
 ---
 
@@ -197,13 +190,14 @@ To pick this up in a new session:
 
 1. Start the environment — [runbook 03](runbooks/03-session-lifecycle.md)
    (`kvm on` → `vm start k8s-cp-01` → `vm start k8s-worker-01` → `devpod up . --ide none`).
-2. Read the [Open decisions](#open-decisions) above and confirm choices.
-3. Consider the deferred **git checkpoint** (initializing the repo) before
-   Phase 3 writes many new files — a clean baseline commit makes Flux diffs
-   legible.
-4. If Phase 4 first: re-run Phase 1 scripts with `--flannel-backend=none`, then
-   Cilium.
-5. Otherwise: bootstrap Flux (Phase 3, deliverable 1).
+2. Decisions 1–3 are **resolved** ([above](#resolved-decisions-2026-10-14));
+   Decision 4 (observability sizing) is still open and only matters at Phase 6.
+3. Git checkpoint is **done** — repo initialized, committed, pushed to private
+   GitHub, so Flux diffs will be legible.
+4. Phase 3, step 1: add `flux`/`sops`/`age` to `.devcontainer/Containerfile`,
+   rebuild (`devpod up . --recreate`), generate the age key + `.sops.yaml`.
+5. Then `flux bootstrap github`, install **Envoy Gateway** via Flux, deploy the
+   first workload with requests/limits, and write runbook 05.
 
 ---
 

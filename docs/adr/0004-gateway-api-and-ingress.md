@@ -1,6 +1,6 @@
 # ADR-0004: Ingress / Gateway API strategy
 
-- **Status:** Proposed (decision deferred to Phase 3 — GitOps)
+- **Status:** Accepted — 2026-10-14 (**Envoy Gateway**)
 - **Date:** 2026-10-13
 - **Deciders:** wasim (with AI assistant review)
 
@@ -36,13 +36,18 @@ reason.
 
 ## Decision
 
-**Deferred.** No ingress/Gateway controller is installed yet. This ADR records
-the state and the options so Phase 3 can make an explicit choice before the first
-workload is exposed.
+**Accepted (2026-10-14): use the Gateway API**
+(https://gateway-api.sigs.k8s.io/) as the north-south abstraction (the CRDs are
+already present) and install **Envoy Gateway** as the controller, delivered
+*via* Flux (HelmRelease). Tracked as
+[Decision 3](../roadmap.md#resolved-decisions-2026-10-14).
 
-**Proposed direction (to confirm in Phase 3):** use the **Gateway API** as the
-north-south abstraction (the CRDs are already present) and install a FOSS
-controller.
+Rationale: CNCF-hosted and Apache-2.0 (strong FOSS story), full Gateway API
+support, and it keeps the ingress choice **independent** of the CNI choice (no
+coupling to the skipped Cilium migration).
+
+> **History:** this ADR was first filed as *Proposed / deferred* on 2026-10-13;
+> the options are retained below. The decision was made in Phase 3.
 
 ### Options
 
@@ -88,10 +93,9 @@ kubectl get pods -A | grep -iE 'ingress|gateway|traefik'   # no controller
 
 ## Revisit when
 
-- **Phase 3** — install the chosen controller via Flux and supersede this ADR
-  with `Accepted` (record the concrete controller + version). This decision is
-  tracked, with options and a recommendation, in
-  [Open decision 3](../roadmap.md#open-decision-3--ingress--gateway-controller)
-  of the [roadmap](../roadmap.md).
-- Cilium migration is scheduled — then reconsider whether Cilium should be the
-  Gateway API controller, collapsing two decisions into one.
+- **Done — Phase 3 (2026-10-14):** controller chosen = **Envoy Gateway**, to be
+  installed via Flux. Record the concrete chart version in
+  [system-inventory.md](../system-inventory.md) once installed.
+- Cilium ever gets scheduled — then reconsider whether Cilium should be the
+  Gateway API controller, collapsing two decisions into one (currently skipped —
+  see the [roadmap](../roadmap.md#resolved-decisions-2026-10-14)).
