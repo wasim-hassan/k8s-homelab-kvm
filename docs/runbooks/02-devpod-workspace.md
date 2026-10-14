@@ -1,8 +1,9 @@
 # Runbook 02 — Operator workspace (Podman + Devpod)
 
 **Goal:** run every cluster-operations tool (`kubectl`, `helm`, `terraform`,
-`k9s`, `yq`, `nvim`) inside a **reproducible, host-independent Devpod workspace**,
-so the Fedora workstation stays minimal and the toolchain is defined as code.
+`k9s`, `yq`, `nvim`, `flux`, `sops`, `age`) inside a **reproducible,
+host-independent Devpod workspace**, so the Fedora workstation stays minimal and
+the toolchain is defined as code.
 
 This is the **operator/client** environment. The cluster itself still runs in the
 two libvirt VMs — the workspace never hosts Kubernetes workloads.
@@ -36,6 +37,7 @@ products. Everything we control is FOSS-named: the build file is a
   `~/.ssh/config`.
 - `~/.cache/k3s-homelab/k3s-v1.37.1+k3s1` (checksum-verified binary cache).
 - `~/.config/nvim` (LazyVim) present.
+- `~/.config/sops/age/keys.txt` (age private key, mode `600`) for SOPS (Phase 3).
 
 ---
 
@@ -134,6 +136,7 @@ Both of the last two are required **together**; see the troubleshooting log.
 | `~/.ssh/k8s-homelab-kvm` | `/home/dev/.ssh/k8s-homelab-kvm` | ro | node SSH key |
 | `~/.cache/k3s-homelab` | `/home/dev/.cache/k3s-homelab` | ro | verified k3s binary |
 | `~/.config/nvim` | `/home/dev/.config/nvim` | rw | LazyVim config |
+| `~/.config/sops` | `/home/dev/.config/sops` | rw | age key for SOPS (Phase 3) |
 
 `KUBECONFIG=/home/dev/.kube/config` is set via `containerEnv`/`remoteEnv`.
 
@@ -152,6 +155,10 @@ Every tool is pinned and verified where upstream allows:
 - **terraform** — matched against HashiCorp's `SHA256SUMS`.
 - **k9s** — Fedora is rpm-based, so the **`.rpm`** artifact is verified against
   the release `checksums.sha256` and installed with `dnf`.
+- **flux** — verified against the release `flux_<ver>_checksums.txt`.
+- **sops** — verified against the release `sops-v<ver>.checksums.txt`.
+- **age** — installed from the Fedora repo as a **GPG-signed RPM** (the upstream
+  release ships no `sha256` file, only signature `.proof` files).
 - **yq / neovim** — upstream publishes **no** `sha256sum`-compatible file, so
   these are downloaded **unverified** (recorded as a known gap in the inventory).
 
@@ -220,7 +227,10 @@ Run **inside** the workspace (`devpod ssh k8s-homelab-kvm`):
 - [ ] `ssh k8s-cp-01 'sudo -n k3s --version'` → `v1.37.1+k3s1`
 - [ ] `helm version --short`, `terraform version`, `k9s version --short`,
       `yq --version`, `nvim --version`
+- [ ] `flux --version` (v2.9.6), `sops --version` (3.13.3), `age --version` (1.3.1)
 - [ ] `infocmp xterm-kitty` → present (k9s runs under kitty)
-- [ ] `ls ~/.config/nvim` and `ls ~/.cache/k3s-homelab` → mounted
+- [ ] `ls ~/.config/nvim`, `~/.cache/k3s-homelab`, `~/.config/sops/age/keys.txt`
+      → mounted
 
-Verified 2026-10-12 on `quay.io/fedora/fedora:44`: all pass.
+Verified 2026-10-12 (core toolchain) and 2026-10-14 (`flux`/`sops`/`age` + age
+key mount) on `quay.io/fedora/fedora:44`: all pass.

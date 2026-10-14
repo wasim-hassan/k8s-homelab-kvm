@@ -15,6 +15,8 @@ ARG TERRAFORM_VERSION=1.16.4
 ARG K9S_VERSION=v0.51.0
 ARG YQ_VERSION=v4.54.1
 ARG NVIM_VERSION=v0.12.6
+ARG FLUX_VERSION=2.9.6
+ARG SOPS_VERSION=3.13.3
 
 # ── Base packages + non-root user ─────────────────────────────────────────
 # The project scripts need bash, python3 + PyYAML (inventory parsing),
@@ -27,7 +29,7 @@ ARG NVIM_VERSION=v0.12.6
 RUN dnf install -y --setopt=install_weak_deps=False \
       ca-certificates curl wget git make jq unzip xz less procps-ng tar gzip \
       openssh-clients python3 python3-pyyaml bash-completion iproute bind-utils \
-      nmap-ncat shadow-utils sudo which hostname findutils kitty-terminfo \
+      nmap-ncat shadow-utils sudo which hostname findutils kitty-terminfo age \
  && dnf clean all \
  && groupadd --gid 1000 dev \
  && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash dev \
@@ -98,6 +100,36 @@ RUN curl -fsSL --retry 3 --retry-delay 2 -o /tmp/nvim.tar.gz \
  && tar -xzf /tmp/nvim.tar.gz -C /opt \
  && ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim \
  && command rm -f /tmp/nvim.tar.gz
+
+# ── flux (checksum verified) ───────────────────────────────────────────────
+# Flux CD CLI: bootstraps the cluster from git (Phase 3) and reconciles the
+# HelmReleases that deliver ingress/monitoring declaratively, not by hand.
+RUN curl -fsSL --retry 3 --retry-delay 2 -o /tmp/flux.tar.gz \
+      "https://github.com/fluxcd/flux2/releases/download/v${FLUX_VERSION}/flux_${FLUX_VERSION}_linux_amd64.tar.gz" \
+ && curl -fsSL --retry 3 --retry-delay 2 -o /tmp/flux_checksums.txt \
+      "https://github.com/fluxcd/flux2/releases/download/v${FLUX_VERSION}/flux_${FLUX_VERSION}_checksums.txt" \
+ && expected="$(grep -E " flux_${FLUX_VERSION}_linux_amd64\.tar\.gz$" /tmp/flux_checksums.txt | awk '{print $1}')" \
+ && actual="$(sha256sum /tmp/flux.tar.gz | awk '{print $1}')" \
+ && echo "flux checksum expected=${expected} actual=${actual}" \
+ && [ -n "$expected" ] && [ "$expected" = "$actual" ] \
+ && tar -xzf /tmp/flux.tar.gz -C /tmp \
+ && install -m 0755 /tmp/flux /usr/local/bin/flux \
+ && command rm -f /tmp/flux.tar.gz /tmp/flux_checksums.txt /tmp/flux
+
+# ── sops (checksum verified) ───────────────────────────────────────────────
+# SOPS encrypts secrets to an age recipient so only ciphertext lives in git.
+# sops handles age keys in-process; the `age` package installed above supplies
+# `age-keygen` (key generation) and the `age` CLI.
+RUN curl -fsSL --retry 3 --retry-delay 2 -o /tmp/sops \
+      "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64" \
+ && curl -fsSL --retry 3 --retry-delay 2 -o /tmp/sops_checksums.txt \
+      "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.checksums.txt" \
+ && expected="$(grep -E " sops-v${SOPS_VERSION}\.linux\.amd64$" /tmp/sops_checksums.txt | awk '{print $1}')" \
+ && actual="$(sha256sum /tmp/sops | awk '{print $1}')" \
+ && echo "sops checksum expected=${expected} actual=${actual}" \
+ && [ -n "$expected" ] && [ "$expected" = "$actual" ] \
+ && install -m 0755 /tmp/sops /usr/local/bin/sops \
+ && command rm -f /tmp/sops /tmp/sops_checksums.txt
 
 # ── SSH client config for the cluster nodes ────────────────────────────────
 # The cluster key itself is bind-mounted at runtime (see devcontainer.json).

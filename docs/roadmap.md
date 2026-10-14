@@ -8,8 +8,8 @@ block each phase. This is also the **resume point** for a new session: read the
 - **Done so far:** Phases 0–2 (substrate, k3s cluster, operator workspace, k9s
   single pane) — see [system-inventory.md](system-inventory.md#current-phase-status).
 - **Current focus:** Phase 3 (GitOps) — ✅ **decisions resolved**
-  ([below](#resolved-decisions-2026-10-14)); next step is adding
-  `flux`/`sops`/`age` to the workspace.
+  ([below](#resolved-decisions-2026-10-14)); step 1 done 2026-10-14 (workspace
+  `flux`/`sops`/`age` + age key + `.sops.yaml`), next is `flux bootstrap github`.
 
 > Version numbers in this document were researched on 2026-10-13 and **will
 > drift**. Re-verify the exact tag/chart version at implementation time before
@@ -194,10 +194,13 @@ To pick this up in a new session:
    Decision 4 (observability sizing) is still open and only matters at Phase 6.
 3. Git checkpoint is **done** — repo initialized, committed, pushed to private
    GitHub, so Flux diffs will be legible.
-4. Phase 3, step 1: add `flux`/`sops`/`age` to `.devcontainer/Containerfile`,
-   rebuild (`devpod up . --recreate`), generate the age key + `.sops.yaml`.
-5. Then `flux bootstrap github`, install **Envoy Gateway** via Flux, deploy the
-   first workload with requests/limits, and write runbook 05.
+4. Phase 3, step 1 **done**: `flux`/`sops`/`age` are in the workspace
+   (`.devcontainer/Containerfile`), the age key exists at
+   `~/.config/sops/age/keys.txt`, and [`.sops.yaml`](../.sops.yaml) holds the
+   recipient.
+5. Next: `flux bootstrap github` (private repo, path `clusters/k8s-homelab`),
+   create the `sops-age` Secret in `flux-system`, install **Envoy Gateway** via
+   Flux, deploy the first workload with requests/limits, and write runbook 05.
 
 ---
 

@@ -1,0 +1,16 @@
+# .sops.yaml — SOPS encryption config for k8s-homelab-kvm
+#
+# Secret manifests are encrypted to an age recipient so only ciphertext is
+# committed. The matching PRIVATE key is NEVER in git:
+#   - host + workspace: ~/.config/sops/age/keys.txt
+#   - in-cluster:       Secret `sops-age` in the `flux-system` namespace
+#                       (key: age.agekey) for Flux's decryption.
+#
+# Convention: encrypted manifests are named `*.sops.yaml` (see path_regex).
+# Only `data`/`stringData` are encrypted, so the rest of a Secret manifest stays
+# readable and diff-friendly.
+
+creation_rules:
+  - path_regex: \.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1za7r9mcftlnw5dgs2w7je46apenkftkm65navsqxdfst0pwtpe3sale4vh

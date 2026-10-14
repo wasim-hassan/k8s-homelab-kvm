@@ -3,7 +3,7 @@
 Verified state of the host and cluster. Every value below was confirmed by running
 the command shown, not assumed.
 
-Last verified: 2026-10-13
+Last verified: 2026-10-14
 
 ---
 
@@ -197,6 +197,9 @@ Tools **inside the workspace** (pinned in `.devcontainer/Containerfile`):
 | `k9s` | v0.51.0 | verified (`.rpm` vs release `checksums.sha256`) |
 | `yq` | v4.54.1 | **unverified** — no upstream checksum file |
 | `nvim` | v0.12.6 | **unverified** — no upstream checksum file |
+| `flux` | v2.9.6 | verified (release `checksums.txt`) |
+| `sops` | v3.13.3 | verified (release `checksums.txt`) |
+| `age` | v1.3.1 | Fedora RPM (GPG-signed, Fedora repo) |
 
 Required `runArgs`: `--network=host`, `--userns=keep-id`,
 `--security-opt=label=disable`. All three are necessary (rootless-Podman uid
@@ -207,6 +210,23 @@ mapping **and** Fedora SELinux); see ADR-0003 and the troubleshooting log.
 > `~/.local/bin/devpod` is
 > `cc50bce09229d5a6d448ac1d4494327f4b8f7a20321e5fcee3bfec1aef0d20c5` — there is
 > nothing official to verify it against.
+
+### Secrets — SOPS + age (Phase 3)
+
+Cluster secrets are encrypted with **SOPS** to an **age** recipient, so only
+ciphertext is committed ([`../.sops.yaml`](../.sops.yaml)).
+
+| Item | Value |
+|---|---|
+| age recipient (public) | `age1za7r9mcftlnw5dgs2w7je46apenkftkm65navsqxdfst0pwtpe3sale4vh` |
+| age key (private) | `~/.config/sops/age/keys.txt` (mode `600`, **never** committed) |
+| Workspace access | `~/.config/sops` → `/home/dev/.config/sops` (bind mount) |
+| Config | [`../.sops.yaml`](../.sops.yaml) — encrypts `data`/`stringData` of `*.sops.yaml` |
+| In-cluster key | Secret `sops-age` in `flux-system` (key `age.agekey`) — created at bootstrap |
+
+The private key is generated once (`age-keygen`, 2026-10-14) and lives **outside**
+the repo; only the public recipient is in git. Round-trip verified inside the
+workspace (encrypt → ciphertext → decrypt).
 
 ### Observability — k9s single pane
 
@@ -323,11 +343,10 @@ Recorded so the runbooks don't assume availability.
 On the **host**: `tuned` (intentional), `k3d`, `ansible`, `flux`, `pipx`,
 `genisoimage`.
 
-In the **workspace**: `flux`, `sops`, `age`, `kubeseal`, `kustomize` — all
-confirmed absent on **2026-10-13**. Phase 3 (GitOps) will add `flux`, `sops` and
-`age` to the `Containerfile` (with checksum verification where upstream
-publishes one). `kubectl -k` covers Kustomize, so a standalone `kustomize` binary
-is not planned.
+In the **workspace**: `kubeseal`, `kustomize` — still confirmed absent on
+**2026-10-14**. `kubectl -k` covers Kustomize, so a standalone `kustomize` binary
+is not planned. `flux`, `sops` and `age` were added to the `Containerfile` on
+2026-10-14 (Phase 3), with checksum verification where upstream publishes one.
 
 Also installed and verified:
 
@@ -336,8 +355,8 @@ PyYAML 6.0.3, `jq` 1.8.1, `virt-install`, `git` 2.55.0, `virsh` (host
 `kubectl`/`helm` removed — see the workspace section above).
 
 In the **workspace**: `kubectl` v1.37.1, `helm` v4.3.0, `terraform`
-v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `git`, `jq`,
-`python3` + PyYAML.
+v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
+`sops` v3.13.3, `age` v1.3.1, `git`, `jq`, `python3` + PyYAML.
 
 ---
 
@@ -358,16 +377,19 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `git`, `jq`,
 | 2 | Workspace builds, runs as `dev`, cluster reachable from workspace | ✅ done |
 | 2 | Host tooling cleaned up (`kubectl`/`helm` removed, trash emptied) | ✅ done |
 | 2 | k9s single pane (repo-hosted config, gruvbox, mounted via `K9S_CONFIG_DIR`) | ✅ done |
+| 3 | GitOps tooling in workspace (`flux` v2.9.6, `sops` v3.13.3, `age` v1.3.1) | ✅ done |
+| 3 | age key + [`.sops.yaml`](../.sops.yaml); SOPS round-trip verified | ✅ done |
+| 3 | `flux bootstrap github` → Flux controllers in-cluster | ⏳ next |
 
 ### Deferred / not yet done
 
-- Git repository **not initialized** (intentional — deferred).
+- Git repository **initialized + pushed** to private GitHub
+  (`wasim-hassan/k8s-homelab-kvm`) on 2026-10-14.
 - `virsh autostart` still `disable` for both VMs (they do not start with the host).
 - Host trash is **empty** (0 B) as of 2026-10-12.
 - `~/.cache/k3s-homelab/k3s-v1.37.1+k3s1` (78 MiB, verified) is **retained** — it
   is bind-mounted read-only into the workspace.
-- Next: **Phase 3 (GitOps)** — FluxCD, SOPS/age for secrets, ingress, first
-  workload. Blocked on four open decisions (Flux git remote, ingress/Gateway
-  controller, Cilium timing, observability sizing) — see the
-  [roadmap](roadmap.md#open-decisions). Roadmap also includes Cilium (replacing
-  Flannel), Terraform, and Ansible.
+- Next: **Phase 3 (GitOps)** — decisions resolved 2026-10-14 (skip Cilium,
+  private GitHub, Envoy Gateway). Workspace tooling and the age key are in place;
+  next is `flux bootstrap github`, then Envoy Gateway via Flux and the first
+  workload. See the [roadmap](roadmap.md#phase-3--gitops-foundation).
