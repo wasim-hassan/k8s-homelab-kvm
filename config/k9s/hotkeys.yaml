@@ -23,6 +23,10 @@ hotKeys:
     shortCut: Shift-5
     description: Namespaces
     command: namespaces
+  shift-x:
+    shortCut: Shift-X
+    description: "XRay deployments (tree: Deployment > ReplicaSet > Pods)"
+    command: xray deploy
   shift-h:
     shortCut: Shift-H
     description: Cluster health (pulses)

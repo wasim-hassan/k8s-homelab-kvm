@@ -7,8 +7,7 @@ k9s:
     favorites:
       - all
       - kube-system
-      - default
-      - kube-public
+      - monitoring
   view:
     active: v1/pods all
   featureGates:

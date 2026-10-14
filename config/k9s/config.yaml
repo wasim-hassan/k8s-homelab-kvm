@@ -9,11 +9,11 @@ k9s:
     enableMouse: false
   thresholds:
     cpu:
-      warn: 60
-      critical: 85
+      warn: 80
+      critical: 90
     memory:
-      warn: 60
-      critical: 85
+      warn: 80
+      critical: 90
   logger:
     tail: 200
     buffer: 1000
