@@ -70,13 +70,23 @@ spec:
         existingSecret: grafana-admin
       persistence:
         enabled: false
+      # Grafana 13 builds an in-memory search index over the provisioned
+      # dashboards, so 256Mi OOMKilled it. 512Mi leaves comfortable headroom.
       resources:
         requests:
-          cpu: 50m
-          memory: 128Mi
-        limits:
-          cpu: 200m
+          cpu: 100m
           memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      sidecar:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
 
     kube-state-metrics:
       resources:
@@ -86,6 +96,18 @@ spec:
         limits:
           cpu: 100m
           memory: 128Mi
+
+    # k3s uses a SQLite datastore (no etcd) and embeds the control-plane
+    # components, so these ServiceMonitors have no endpoints and their
+    # dashboards would only ever show "No data". Disable them.
+    kubeEtcd:
+      enabled: false
+    kubeControllerManager:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeProxy:
+      enabled: false
 
     prometheus-node-exporter:
       resources:
