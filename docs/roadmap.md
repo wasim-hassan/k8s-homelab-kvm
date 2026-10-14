@@ -11,11 +11,13 @@ block each phase. This is also the **resume point** for a new session: read the
 - **Last verified:** 2026-10-15
 - **Done so far (verified):** substrate (KVM/libvirt/VMs), k3s cluster,
   Devpod workspace, k9s, GitOps (Flux + SOPS/age + Envoy Gateway + podinfo),
-  and the observability stack (kube-prometheus-stack).
+  the observability stack (kube-prometheus-stack), and the **Flux Web UI**
+  (Flux migrated to the **Flux Operator**, [ADR-0006](adr/0006-flux-operator-managed.md)).
 - **Current focus:** Phase 7 (Security hardening).
   Phase 3 (GitOps) done 2026-10-14; Phase 5 (IaC) re-scoped 2026-10-15
   ([ADR-0005](adr/0005-no-ansible-node-config.md)); Phase 6 (Observability)
-  **done** 2026-10-15.
+  **done** 2026-10-15; Flux moved to operator-managed + Web UI **done** 2026-10-15
+  ([runbook 07](runbooks/07-flux-webui.md)).
 - **Remaining:** Phase 7, Phase 8, and the deferred/stretch items.
 
 ### Next phase — Phase 7 (security hardening)
@@ -89,11 +91,17 @@ first real workload.
    encrypted Secret decrypted in-cluster. ✅
 
 **Files added**
-- `clusters/k8s-homelab/flux-system/` — Flux bootstrap output.
+- `clusters/k8s-homelab/flux-system/` — Flux bootstrap output. *(Removed 2026-10-15
+  when Flux moved to operator-managed — [ADR-0006](adr/0006-flux-operator-managed.md).)*
 - `clusters/k8s-homelab/{kustomization,infrastructure,apps}.yaml` — app-of-apps.
 - `infrastructure/envoy-gateway/` — Gateway controller as `HelmRelease`.
 - `apps/podinfo/` — first app manifests + `secret.sops.yaml`.
 - Runbook [`docs/runbooks/05-gitops-flux.md`](runbooks/05-gitops-flux.md).
+
+> **2026-10-15 — Flux is now operator-managed.** A `FluxInstance` + the **Flux
+> Operator** adopt the Flux components/source, and the operator's **Web UI** is
+> exposed at `flux.local` ([ADR-0006](adr/0006-flux-operator-managed.md),
+> [runbook 07](runbooks/07-flux-webui.md)). Flux is no longer CLI-bootstrapped.
 
 ---
 
@@ -207,6 +215,7 @@ repo's memory is complete.
 | 3 | Ingress / Gateway controller | **Envoy Gateway** (CNCF, Apache-2.0, Gateway API) — [ADR-0004](adr/0004-gateway-api-and-ingress.md) now **Accepted**. |
 | 4 | Observability sizing | **Bump VM RAM + trim the stack.** `k8s-cp-01` 3 GiB, `k8s-worker-01` 1536 MiB; `kube-prometheus-stack` with Alertmanager off, Prometheus `6h`/2Gi. Resolved 2026-10-15 — see [Phase 6](#phase-6--observability-stack). |
 | 5 | Config management (Ansible?) | **No Ansible** — keep `10-prepare-nodes.sh`; Terraform-libvirt deferred (redundant with the external provisioner); Talos is the long-term replacement. [ADR-0005](adr/0005-no-ansible-node-config.md). |
+| 6 | Flux status / Web UI | **Flux Web UI via the Flux Operator** — migrate Flux to operator-managed (`FluxInstance`) and expose the Flux Status UI at `flux.local`. Weave GitOps ruled out (unmaintained + breaks on HelmRelease `v2`); `fluxcd/webui` archived. [ADR-0006](adr/0006-flux-operator-managed.md), [runbook 07](runbooks/07-flux-webui.md). |
 
 The option tables for decisions 1–3 are preserved in git history; the
 resolutions above supersede them.
@@ -237,7 +246,11 @@ To pick this up in a new session:
 6. Phase 6 **done** (2026-10-15): `kube-prometheus-stack` via Flux, Grafana at
    `grafana.local`, VMs bumped for Decision 4. See
    [runbook 06](runbooks/06-observability.md).
-7. **Next: Phase 7 (security hardening)** — RBAC least-privilege, Pod Security
+7. **Flux Web UI done** (2026-10-15): Flux migrated to the **Flux Operator**
+   (`FluxInstance`), Web UI at `flux.local` ([ADR-0006](adr/0006-flux-operator-managed.md),
+   [runbook 07](runbooks/07-flux-webui.md)). Add `192.168.123.11 flux.local` to
+   the host `/etc/hosts`.
+8. **Next: Phase 7 (security hardening)** — RBAC least-privilege, Pod Security
    Standards, and a secrets-hygiene audit (only SOPS-encrypted secrets in git).
    NetworkPolicy is deferred until Phase 4 (Cilium).
 

@@ -4,8 +4,9 @@ A 2-node k3s homelab on libvirt/KVM, with the operator toolchain in a FOSS-only
 Devpod (Podman) workspace. This index links every document.
 
 Current phase: **6 complete** (Phases 0–3, 5–6: k3s, workspace, k9s, GitOps with
-Flux/SOPS, and the observability stack). **Phase 7 (security hardening) is next.**
-See the [roadmap](roadmap.md) for the forward plan and decisions.
+Flux/SOPS, and the observability stack), plus the **Flux Web UI** (Flux migrated
+to the Flux Operator). **Phase 7 (security hardening) is next.** See the
+[roadmap](roadmap.md) for the forward plan and decisions.
 
 ---
 
@@ -19,6 +20,7 @@ See the [roadmap](roadmap.md) for the forward plan and decisions.
 | 04 | [k9s single pane](runbooks/04-k9s-single-pane.md) | observe/inspect the cluster (k9s, gruvbox, hotkeys) |
 | 05 | [GitOps with Flux CD](runbooks/05-gitops-flux.md) | Flux bootstrap, SOPS/age, Envoy Gateway, podinfo workload |
 | 06 | [Observability](runbooks/06-observability.md) | kube-prometheus-stack via Flux, Grafana route, Prometheus targets |
+| 07 | [Flux Web UI](runbooks/07-flux-webui.md) | migrate Flux to the Flux Operator, Flux Status UI at `flux.local` |
 
 ## ADRs (why)
 
@@ -29,6 +31,7 @@ See the [roadmap](roadmap.md) for the forward plan and decisions.
 | 0003 | [Operator environment in a Devpod workspace](adr/0003-devpod-workspace.md) |
 | 0004 | [Ingress / Gateway API strategy](adr/0004-gateway-api-and-ingress.md) *(accepted — Envoy Gateway)* |
 | 0005 | [No Ansible — node config stays scripted](adr/0005-no-ansible-node-config.md) *(accepted)* |
+| 0006 | [Flux managed by the Flux Operator (Web UI)](adr/0006-flux-operator-managed.md) *(accepted)* |
 
 ## Reference
 
@@ -48,7 +51,7 @@ See the [roadmap](roadmap.md) for the forward plan and decisions.
 | [`../ansible/`](../ansible) | dropped — node config stays scripted ([ADR-0005](adr/0005-no-ansible-node-config.md)) |
 | [`../config/k9s/`](../config/k9s) | k9s config, hotkeys, gruvbox skin (mounted via `K9S_CONFIG_DIR`) |
 | [`../clusters/`](../clusters) | Flux app-of-apps (`clusters/k8s-homelab/`) |
-| [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring) |
+| [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring, Flux Operator) |
 | [`../apps/`](../apps) | workloads (podinfo) with encrypted secrets |
 | [`../.devcontainer/`](../.devcontainer) | `Containerfile` + `devcontainer.json` |
 

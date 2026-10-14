@@ -4,6 +4,13 @@
 
 **Scope:** this documents what exists in the repo and cluster at `main@sha1:46196596` (HEAD 2026-10-14 18:25 UTC).
 
+> **Update 2026-10-15 — Flux is now operator-managed.** The Flux CLI bootstrap
+> below (and `clusters/k8s-homelab/flux-system/`) has been **superseded**: Flux is
+> managed by the **Flux Operator** via a `FluxInstance`, and the bootstrap dir was
+> removed. See [runbook 07](07-flux-webui.md) and
+> [ADR-0006](../adr/0006-flux-operator-managed.md). The SOPS/age, Envoy Gateway
+> and podinfo parts below are unchanged and still authoritative.
+
 ## Topology
 
 | Component | Namespace | Source |

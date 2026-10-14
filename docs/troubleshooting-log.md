@@ -890,3 +890,71 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   their stock dashboards are dead weight. Turning off the components keeps the
   Prometheus target list honest.
 
+## 2026-10-15 — FluxInstance aborted the whole Flux Operator install (`no matches for kind "FluxInstance"`)
+
+- **Symptom:** After committing the Flux Operator (OCIRepository + HelmRelease)
+  **and** a `FluxInstance` in the same directory, the `infrastructure`
+  Kustomization went `Ready=False`:
+  ```
+  FluxInstance/flux-system/flux dry-run failed: no matches for kind "FluxInstance"
+  in version "fluxcd.controlplane.io/v1"
+  ```
+  The OCIRepository and HelmRelease were **never created** — the operator never
+  installed, so the Web UI never came up.
+- **Investigation:**
+  ```bash
+  devpod ssh k8s-homelab-kvm --command 'flux get kustomizations -A'
+  # infrastructure: FluxInstance/flux-system/flux dry-run failed: no matches for kind "FluxInstance" ...
+  devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get ocirepository,helmrelease'
+  # NotFound  ← nothing applied, not even the operator HelmRelease
+  ```
+- **Root cause:** `kustomize-controller` performs a **server-side dry run of the
+  entire resource set before applying any of it**. The `FluxInstance` CRD is
+  installed by the Flux Operator (which the HelmRelease installs), so at apply
+  time the kind does not exist → the dry run fails → **the whole batch is
+  skipped**, including the very HelmRelease that would have created the CRD. A
+  chicken-and-egg deadlock.
+- **Fix:** Split the `FluxInstance` into its own Kustomization
+  (`clusters/k8s-homelab/flux-instance.yaml`) with `dependsOn: [infrastructure]`,
+  so the operator (and its CRDs) exist before the FluxInstance is applied.
+  Commits `0b94a97` (split) + `4271ca6` (retire old bootstrap).
+- **Verify:**
+  ```bash
+  devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get fluxinstance'
+  # flux   True   Reconciliation finished ...   v2.9.6@sha256:...
+  devpod ssh k8s-homelab-kvm --command 'flux get kustomizations -A'   # all Ready
+  ```
+- **Lesson:** A Flux Kustomization applies **atomically at dry-run**: one
+  un-creatable resource (a CR whose CRD is installed by another resource in the
+  same batch) blocks **everything**. Install CRD-providing controllers in one
+  Kustomization and the CRs they enable in a separate Kustomization that
+  `dependsOn` it.
+
+## 2026-10-15 — Deleting the repo-managed Flux did *not* prune the Flux CRDs (prune disabled)
+
+- **Context:** Migrating Flux to the operator meant deleting the bootstrap dir
+  `clusters/k8s-homelab/flux-system/` (which held `gotk-components.yaml` — the Flux
+  CRDs + controllers) from git. The `flux-system` Kustomization's **inventory**
+  still listed all those objects, so removing them looked like it would **prune
+  the Flux CRDs → cascade-delete every Flux CR**.
+- **Investigation:**
+  ```bash
+  devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get kustomization flux-system \
+    -o jsonpath="{.status.inventory.entries[*].id}"'
+  # ... includes _gitrepositories.source.toolkit.fluxcd.io_apiextensions.k8s.io_CustomResourceDefinition
+  devpod ssh k8s-homelab-kvm --command 'kubectl get crd gitrepositories.source.toolkit.fluxcd.io \
+    -o jsonpath="{.metadata.annotations}"'
+  # kustomize.toolkit.fluxcd.io/prune: Disabled ; kustomize.toolkit.fluxcd.io/ssa: Ignore
+  ```
+- **Root cause / resolution:** Once the operator adopts Flux, it annotates
+  **every** object it manages with `kustomize.toolkit.fluxcd.io/prune: Disabled`
+  (and `ssa: Ignore`). kustomize-controller **skips pruning** any object carrying
+  that annotation, so deleting the bootstrap dir is safe — the CRDs and
+  controllers survive. Confirmed: after removal + reconcile the controllers kept
+  their original `AGE` (no restarts) and `kubectl get crd | grep -c fluxcd`
+  stayed 15.
+- **Lesson:** Flux prune honours `kustomize.toolkit.fluxcd.io/prune: Disabled`.
+  Before deleting objects out of a pruned Kustomization, check the inventory
+  **and** the objects' annotations — a manager that marks its objects
+  `prune: Disabled` will not lose them.
+

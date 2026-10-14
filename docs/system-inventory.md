@@ -392,6 +392,7 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 | 6 | Monitoring stack (`kube-prometheus-stack` 92.7.0) deployed via Flux `HelmRelease` | ✅ done |
 | 6 | Grafana exposed at `grafana.local` (HTTPRoute + ReferenceGrant), admin via SOPS secret | ✅ done |
 | 6 | Decision 4 (sizing) resolved — VMs bumped, stack fits under 65% per node | ✅ done |
+| 3 | Flux upgraded to **operator-managed** (Flux Operator 0.61.0 + FluxInstance) with the Flux Web UI at `flux.local` ([ADR-0006](adr/0006-flux-operator-managed.md), [runbook 07](runbooks/07-flux-webui.md)) | ✅ done |
 
 ### Deferred / not yet done
 
@@ -401,24 +402,46 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 - Host trash is **empty** (0 B) as of 2026-10-12.
 - `~/.cache/k3s-homelab/k3s-v1.37.1+k3s1` (78 MiB, verified) is **retained** — it
   is bind-mounted read-only into the workspace.
+- The **Flux Web UI** was added 2026-10-15 by migrating Flux to the Flux Operator
+  (a Phase 3 evolution) — see [runbook 07](runbooks/07-flux-webui.md) and
+  [ADR-0006](adr/0006-flux-operator-managed.md). Requires `192.168.123.11 flux.local`
+  in the host `/etc/hosts` (manual, needs sudo).
 - Next: **Phase 7 (Security hardening)** — RBAC, Pod Security Standards, secrets
   hygiene audit. NetworkPolicy waits on Phase 4 (Cilium). Phase 6 is complete —
   see [runbook 06](runbooks/06-observability.md).
 
 ---
 
-## GitOps state (Phase 3 — Flux CD)
+## GitOps state (Phase 3 — Flux CD, now operator-managed)
 
-Verified 2026-10-15, reconciled at `main@sha1:46196596`.
+Verified 2026-10-15, reconciled at `main@sha1:4271ca66`.
 
 | Item | Value |
 |---|---|
 | Flux version | **v2.9.6** (source / kustomize / helm / notification controllers) |
-| Bootstrap | `flux bootstrap github` (read-only **deploy key**, `--token-auth=false`) |
-| Git source | `ssh://git@github.com/wasim-hassan/k8s-homelab-kvm` (branch `main`, path `clusters/k8s-homelab`) |
-| App-of-apps | [`../clusters/k8s-homelab/`](../clusters/k8s-homelab) — `flux-system` + `infrastructure.yaml` + `apps.yaml` |
-| Kustomizations | `flux-system`, `infrastructure`, `apps` — all `Ready=True` |
+| Managed by | **Flux Operator 0.61.0** via `FluxInstance flux` — migrated from CLI bootstrap 2026-10-15 ([ADR-0006](adr/0006-flux-operator-managed.md), [runbook 07](runbooks/07-flux-webui.md)) |
+| Git source | `ssh://git@github.com/wasim-hassan/k8s-homelab-kvm` (`refs/heads/main`, path `clusters/k8s-homelab`) |
+| App-of-apps | [`../clusters/k8s-homelab/`](../clusters/k8s-homelab) — `infrastructure.yaml` + `flux-instance.yaml` + `apps.yaml` |
+| Kustomizations | `flux-system`, `infrastructure`, `flux-instance`, `apps` — all `Ready=True` |
 | SOPS decryption | `spec.decryption` (`provider: sops`, `secretRef: sops-age`) on `infrastructure` + `apps` |
+
+> The original `flux bootstrap` manifests (`clusters/k8s-homelab/flux-system/`)
+> were removed once the operator adopted Flux. The operator annotates its objects
+> `kustomize.toolkit.fluxcd.io/prune: Disabled` (and `ssa: Ignore`), so the old
+> Kustomization could not prune the Flux CRDs/components. The `flux-system`
+> Kustomization/GitRepository now carry `app.kubernetes.io/managed-by: flux-operator`.
+
+### Flux Operator + Web UI
+
+| Item | Value |
+|---|---|
+| Chart | **flux-operator 0.61.0** (app v0.61.0) via OCIRepository `oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator` |
+| Delivery | HelmRelease `flux-operator` in `flux-system` — `Ready=True` |
+| FluxInstance | `flux` — `Ready=True`, distribution `v2.9.6@sha256:40bc63c1…` |
+| Web UI | Flux Status on Service `flux-operator:9080`; HTTPRoute `flux-operator` host `flux.local` (`Accepted=True`) |
+| Identity | anonymous user `admin` in group `flux-admin` → ClusterRoleBinding `flux-admin` → ClusterRole `flux-web-admin` (view + actions) |
+| ReferenceGrant | `allow-flux-system-to-gateway` (in `envoy-gateway-system`) |
+| Manifests | [`../infrastructure/flux-operator/`](../infrastructure/flux-operator) + [`../clusters/k8s-homelab/flux-instance/`](../clusters/k8s-homelab/flux-instance) |
 
 ### Envoy Gateway (infrastructure)
 
