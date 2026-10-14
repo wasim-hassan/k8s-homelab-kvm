@@ -71,14 +71,15 @@ spec:
       persistence:
         enabled: false
       # Grafana 13 builds an in-memory search index over the provisioned
-      # dashboards, so 256Mi OOMKilled it. 512Mi leaves comfortable headroom.
+      # dashboards. 256Mi OOMKilled it, and it settled near ~510Mi against a
+      # 512Mi limit, so 768Mi gives real headroom on this small node.
       resources:
         requests:
           cpu: 100m
-          memory: 256Mi
+          memory: 384Mi
         limits:
           cpu: 500m
-          memory: 512Mi
+          memory: 768Mi
       sidecar:
         resources:
           requests:
