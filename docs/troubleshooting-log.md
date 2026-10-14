@@ -785,3 +785,39 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
 - **Lesson:** Expect brief post-reboot churn on a small cluster. Wait and
   re-check before force-restarting controllers.
 
+## 2026-10-15 — HelmRelease rejected (`spec.upgrade.remediation.retryInterval` not in schema)
+
+- **Symptom:** Kustomization `infrastructure` went `Ready=False` at the
+  monitoring commit: `HelmRelease/monitoring/kube-prometheus-stack dry-run
+  failed: ... .spec.upgrade.remediation.retryInterval: field not declared in
+  schema`.
+- **Root cause:** I put the upgrade retry strategy under
+  `spec.upgrade.remediation`. In `helm.toolkit.fluxcd.io/v2` the retry strategy
+  is a **separate top-level field**, `spec.upgrade.strategy` (`{name,
+  retryInterval}`); `spec.upgrade.remediation` only holds
+  `retries`/`strategy`/`remediateLastFailure`/`ignoreTestFailures`.
+- **Fix:** Moved it to `spec.upgrade.strategy: {name: RetryOnFailure,
+  retryInterval: 5m}` (same shape as the working Envoy Gateway HelmRelease).
+  Commit `1f79895`.
+- **Verify:** `flux get kustomization infrastructure` → `Ready=True`;
+  `flux get helmreleases -A` → `kube-prometheus-stack` Ready.
+- **Lesson:** When in doubt, read the CRD: `kubectl get crd
+  helmreleases.helm.toolkit.fluxcd.io -o json` and inspect
+  `...spec.properties.upgrade.properties`. And a **server-side dry run**
+  (`kubectl apply --dry-run=server`) catches schema errors before pushing.
+
+## 2026-10-15 — `flux reconcile ... --with-source` looks like it hangs
+
+- **Symptom:** A single `flux reconcile kustomization infrastructure
+  --with-source` call produced no output and exceeded a 180s timeout.
+- **Root cause:** Not a hang — `flux reconcile` **blocks until the
+  reconciliation finishes**, and installing `kube-prometheus-stack` (pulling the
+  chart + CRDs + waiting for pods) takes several minutes.
+- **Fix:** Instead of one blocking call, reconcile then **poll**:
+  `for i in $(seq 1 20); do flux get kustomization infrastructure -n flux-system;
+  sleep 15; done`.
+- **Verify:** Kustomization reaches `Ready=True` at the pushed revision;
+  `kubectl -n monitoring get pods` shows all Running.
+- **Lesson:** `flux reconcile` waits; for slow Helm installs, poll status rather
+  than wrapping the reconcile in a short timeout.
+

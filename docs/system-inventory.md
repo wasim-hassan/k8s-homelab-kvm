@@ -319,10 +319,13 @@ Verified bidirectional: `k8s-cp-01` → `k8s-worker-01` and back both ping.
 > [`inventory/nodes.yml`](../inventory/nodes.yml) updated to match.
 
 **Watch items:**
-- `k8s-worker-01` now has **~880 MiB available** idle — headroom for
+- `k8s-worker-01` had **~880 MiB available** idle before Phase 6 — headroom for
   node-exporter and scheduling.
-- `k8s-cp-01` now has **~1600 MiB available** with the control plane up, which
-  is what makes room for the trimmed Prometheus/Grafana stack.
+- `k8s-cp-01` had **~1600 MiB available** with the control plane up, which is
+  what made room for the trimmed Prometheus/Grafana stack.
+- **After Phase 6** (monitoring stack running, 2026-10-15): `kubectl top nodes`
+  reports `k8s-cp-01` **1847 Mi / 2977 Mi (63%)** and `k8s-worker-01`
+  **903 Mi / 1463 Mi (61%)** — both nodes below 65% with all 6 monitoring pods up.
 
 Bump commands if a future phase needs more (raise the max **before** the current
 size; do it on a shut-off domain so it persists cleanly):
@@ -385,6 +388,10 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 | 3 | GitOps tooling in workspace (`flux` v2.9.6, `sops` v3.13.3, `age` v1.3.1) | ✅ done |
 | 3 | age key + [`.sops.yaml`](../.sops.yaml); SOPS round-trip verified | ✅ done |
 | 3 | `flux bootstrap github` → Flux controllers in-cluster + SOPS/age wired + Envoy Gateway + podinfo | ✅ done |
+| 5 | IaC re-scoped — Ansible dropped, Terraform deferred ([ADR-0005](adr/0005-no-ansible-node-config.md)) | ✅ done |
+| 6 | Monitoring stack (`kube-prometheus-stack` 92.7.0) deployed via Flux `HelmRelease` | ✅ done |
+| 6 | Grafana exposed at `grafana.local` (HTTPRoute + ReferenceGrant), admin via SOPS secret | ✅ done |
+| 6 | Decision 4 (sizing) resolved — VMs bumped, stack fits under 65% per node | ✅ done |
 
 ### Deferred / not yet done
 
@@ -394,10 +401,9 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 - Host trash is **empty** (0 B) as of 2026-10-12.
 - `~/.cache/k3s-homelab/k3s-v1.37.1+k3s1` (78 MiB, verified) is **retained** — it
   is bind-mounted read-only into the workspace.
-- Next: **Phase 6 (Observability)** — resolve [Decision 4](roadmap.md#still-open--decision-4--observability-sizing)
-  (sizing) first, then deploy Prometheus/Grafana via Flux. Phase 5 (IaC) is an
-  unblocked parallel option. Phase 3 is complete — see
-  [runbook 05](runbooks/05-gitops-flux.md).
+- Next: **Phase 7 (Security hardening)** — RBAC, Pod Security Standards, secrets
+  hygiene audit. NetworkPolicy waits on Phase 4 (Cilium). Phase 6 is complete —
+  see [runbook 06](runbooks/06-observability.md).
 
 ---
 
@@ -436,3 +442,21 @@ Verified 2026-10-15, reconciled at `main@sha1:46196596`.
 | Routing | HTTPRoute `podinfo` host `podinfo.local` → Gateway `eg`; ReferenceGrant `allow-podinfo-to-gateway` |
 | Secret | SOPS-encrypted `podinfo-message` (decrypted in-cluster) → `PODINFO_UI_MESSAGE` |
 | Manifests | [`../apps/podinfo/`](../apps/podinfo) |
+
+### Monitoring (Phase 6 — observability)
+
+Verified 2026-10-15, reconciled at `main@sha1:1f798951`.
+
+| Item | Value |
+|---|---|
+| Chart | **kube-prometheus-stack 92.7.0** (app v0.94.1) via `HelmRepository prometheus-community` |
+| Delivery | HelmRelease `kube-prometheus-stack` in `monitoring` — `Ready=True` |
+| Prometheus | **v3.15.0**; retention `6h` / `1500MB`; PVC 2Gi on `local-path` (Bound) |
+| Grafana | **13.2.4** (distroless), Service `grafana:80`, route host `grafana.local` |
+| operator | `prometheus-operator` v0.94.1 |
+| kube-state-metrics | v2.20.0 |
+| node-exporter | v1.12.1 (DaemonSet, 1 per node) |
+| Alertmanager | **disabled** (no notification target; saves memory) |
+| Targets | 15 active, **15 up** |
+| Secret | SOPS-encrypted `grafana-admin` (`admin-user` / `admin-password`) |
+| Manifests | [`../infrastructure/monitoring/`](../infrastructure/monitoring) |

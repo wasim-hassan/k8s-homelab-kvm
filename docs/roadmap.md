@@ -8,16 +8,25 @@ block each phase. This is also the **resume point** for a new session: read the
 - **Done so far:** Phases 0–3 (substrate, k3s cluster, operator workspace + k9s,
   GitOps: Flux CD + SOPS/age, Envoy Gateway, first workload) — see
   [system-inventory.md](system-inventory.md#current-phase-status).
-- **Current focus:** Phase 3 (GitOps) — ✅ **complete** 2026-10-15. Flux CD
-  bootstrapped (deploy key), SOPS/age decryption wired, Envoy Gateway installed
-  via Flux, and the first workload (podinfo) deployed with requests/limits and an
-  encrypted Secret. Next: Phase 6 (Observability) — resolve
-  [Decision 4](#still-open--decision-4--observability-sizing) (sizing) first; Phase 5 (IaC)
-  remains a parallel option.
+- **Last verified:** 2026-10-15
+- **Done so far (verified):** substrate (KVM/libvirt/VMs), k3s cluster,
+  Devpod workspace, k9s, GitOps (Flux + SOPS/age + Envoy Gateway + podinfo),
+  and the observability stack (kube-prometheus-stack).
+- **Current focus:** Phase 7 (Security hardening).
+  Phase 3 (GitOps) done 2026-10-14; Phase 5 (IaC) re-scoped 2026-10-15
+  ([ADR-0005](adr/0005-no-ansible-node-config.md)); Phase 6 (Observability)
+  **done** 2026-10-15.
+- **Remaining:** Phase 7, Phase 8, and the deferred/stretch items.
 
-> Version numbers in this document were researched on 2026-10-13 and **will
-> drift**. Re-verify the exact tag/chart version at implementation time before
-> pinning. Nothing here is installed yet.
+### Next phase — Phase 7 (security hardening)
+- **Objective.** Add real security posture to the cluster without adding weight.
+- **Scope.** RBAC least-privilege for ServiceAccounts; Pod Security Standards
+  (`restricted` where feasible); audit that only SOPS-encrypted secrets live in
+  git. NetworkPolicy is deferred until a policy-capable CNI (Phase 4).
+
+> **Version note.** Component versions below were researched first, then
+> **pinned and verified in the cluster** at install time. Re-verify before
+> changing a pinned version.
 
 ---
 
@@ -31,8 +40,8 @@ block each phase. This is also the **resume point** for a new session: read the
 | **3** | **GitOps foundation (Flux + SOPS/age, ingress, first workload)** | ✅ done | — |
 | 4 | CNI migration → Cilium (+ Hubble) | 💤 skip for now | Decision 1 → **skip Cilium** |
 | 5 | IaC — kept as scripts; **Ansible dropped, Terraform deferred** ([ADR-0005](adr/0005-no-ansible-node-config.md)) | ➖ re-scoped | — |
-| 6 | Observability stack (Prometheus/Grafana/Alertmanager) | ⏳ | Decision 4 (sizing) |
-| 7 | Security hardening (RBAC, NetworkPolicy, PSS) | ⏳ | Phase 4 for NetworkPolicy |
+| 6 | Observability stack (Prometheus + Grafana; Alertmanager off) | ✅ done | — |
+| 7 | Security hardening (RBAC, NetworkPolicy, PSS) | ⏳ next | Phase 4 for NetworkPolicy |
 | 8 | CI/CD + image automation | ⏳ | — (Phase 3 done) |
 | — | Stretch: Talos, storage (Longhorn), backup (Velero) | 💤 later | — |
 
@@ -135,14 +144,25 @@ simply than Ansible. Full reasoning in [ADR-0005](adr/0005-no-ansible-node-confi
 
 ## Phase 6 — Observability stack
 
+> **Status: ✅ complete (2026-10-15).** Implemented in
+> [`infrastructure/monitoring/`](../infrastructure/monitoring) as a Flux
+> `HelmRelease`. Procedure + verification:
+> [runbook 06](runbooks/06-observability.md).
+
 **Goal:** metrics, dashboards, alerting — the SRE signal layer.
 
-- `kube-prometheus-stack` (Prometheus + Grafana + Alertmanager) via Flux
-  `HelmRelease`. *Researched chart:* **91.8.2** (app v0.94.1).
-- **Sizing is the blocker (Decision 4):** the cluster is only ~3 GiB total
-  (2 GiB CP + 1 GiB worker). A default Prometheus will OOM the control plane.
-  See [memory budget](system-inventory.md#memory-budget) for the VM bump
-  procedure.
+- **`kube-prometheus-stack`** deployed via Flux `HelmRelease` — installed chart
+  **92.7.0** (prometheus-operator **v0.94.1**). ✅
+- Stack trimmed for the small cluster: **Alertmanager disabled**, Prometheus
+  `retention 6h` + 2Gi `local-path` PVC, explicit requests/limits everywhere. ✅
+- **Decision 4 (sizing)** resolved by bumping the VMs first
+  (`k8s-cp-01` 3 GiB, `k8s-worker-01` 1536 MiB); both nodes stay under 65% with
+  the stack running. See [memory budget](system-inventory.md#memory-budget). ✅
+- Grafana exposed at `grafana.local` through Envoy Gateway; admin credentials
+  from a SOPS-encrypted Secret. ✅
+
+**Deferred:** Alertmanager/alert routing (no notification target yet); dashboards
+ship with the chart.
 
 ---
 
@@ -185,15 +205,18 @@ repo's memory is complete.
 | 1 | Cilium timing | **Skip Cilium for now** — keep Flannel (lightweight priority). Revisit as a stretch. |
 | 2 | Git remote for Flux | **Private GitHub** — `wasim-hassan/k8s-homelab-kvm` (git init + push done). |
 | 3 | Ingress / Gateway controller | **Envoy Gateway** (CNCF, Apache-2.0, Gateway API) — [ADR-0004](adr/0004-gateway-api-and-ingress.md) now **Accepted**. |
+| 4 | Observability sizing | **Bump VM RAM + trim the stack.** `k8s-cp-01` 3 GiB, `k8s-worker-01` 1536 MiB; `kube-prometheus-stack` with Alertmanager off, Prometheus `6h`/2Gi. Resolved 2026-10-15 — see [Phase 6](#phase-6--observability-stack). |
 | 5 | Config management (Ansible?) | **No Ansible** — keep `10-prepare-nodes.sh`; Terraform-libvirt deferred (redundant with the external provisioner); Talos is the long-term replacement. [ADR-0005](adr/0005-no-ansible-node-config.md). |
 
 The option tables for decisions 1–3 are preserved in git history; the
 resolutions above supersede them.
 
-### Still open — Decision 4 — Observability sizing
-Options in [Phase 6](#phase-6--observability-stack). Decide when Phase 6 begins:
-bump VM RAM (and to what), a lightweight in-cluster stack (reduced
-retention/resources or VictoriaMetrics), or defer.
+### Resolved — Decision 4 — Observability sizing
+Resolved 2026-10-15: bump the VM RAM (`k8s-cp-01` 3 GiB, `k8s-worker-01`
+1536 MiB) and run a trimmed `kube-prometheus-stack` (Alertmanager off,
+Prometheus `6h` retention / 2Gi `local-path` PVC). Both nodes stay below 65%
+memory with the stack up. See [Phase 6](#phase-6--observability-stack) and
+[runbook 06](runbooks/06-observability.md).
 
 ---
 
@@ -203,18 +226,20 @@ To pick this up in a new session:
 
 1. Start the environment — [runbook 03](runbooks/03-session-lifecycle.md)
    (`kvm on` → `vm start k8s-cp-01` → `vm start k8s-worker-01` → `devpod up . --ide none`).
-2. Decisions **1–3 and 5** are resolved ([above](#resolved-decisions));
-   Decision 4 (observability sizing) is resolved during Phase 6.
+2. Decisions **1–5** are all resolved ([above](#resolved-decisions)).
 3. Git checkpoint is **done** — repo initialized, committed, pushed to private
    GitHub, so Flux diffs will be legible.
-4. Phase 3 **done** (2026-10-15): Flux bootstrapped, `sops-age` wired, Envoy
+4. Phase 3 **done** (2026-10-14): Flux bootstrapped, `sops-age` wired, Envoy
    Gateway installed via Flux, and `podinfo` deployed with an encrypted Secret.
    See [runbook 05](runbooks/05-gitops-flux.md).
 5. Phase 5 **re-scoped** (2026-10-15): Ansible dropped, Terraform deferred —
    [ADR-0005](adr/0005-no-ansible-node-config.md).
-6. Phase 6 — Observability via Flux (kube-prometheus-stack); sizing per
-   [Decision 4](#still-open--decision-4--observability-sizing). See
+6. Phase 6 **done** (2026-10-15): `kube-prometheus-stack` via Flux, Grafana at
+   `grafana.local`, VMs bumped for Decision 4. See
    [runbook 06](runbooks/06-observability.md).
+7. **Next: Phase 7 (security hardening)** — RBAC least-privilege, Pod Security
+   Standards, and a secrets-hygiene audit (only SOPS-encrypted secrets in git).
+   NetworkPolicy is deferred until Phase 4 (Cilium).
 
 ---
 

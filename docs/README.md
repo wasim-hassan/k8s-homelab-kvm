@@ -3,9 +3,9 @@
 A 2-node k3s homelab on libvirt/KVM, with the operator toolchain in a FOSS-only
 Devpod (Podman) workspace. This index links every document.
 
-Current phase: **3 complete** (GitOps: Flux CD + SOPS/age, Envoy Gateway, first
-workload). See the [roadmap](roadmap.md) for the forward plan and open
-decisions.
+Current phase: **6 complete** (Phases 0–3, 5–6: k3s, workspace, k9s, GitOps with
+Flux/SOPS, and the observability stack). **Phase 7 (security hardening) is next.**
+See the [roadmap](roadmap.md) for the forward plan and decisions.
 
 ---
 
@@ -18,6 +18,7 @@ decisions.
 | 03 | [Session lifecycle](runbooks/03-session-lifecycle.md) | start/stop order (`kvm on` → VMs → `devpod up`) |
 | 04 | [k9s single pane](runbooks/04-k9s-single-pane.md) | observe/inspect the cluster (k9s, gruvbox, hotkeys) |
 | 05 | [GitOps with Flux CD](runbooks/05-gitops-flux.md) | Flux bootstrap, SOPS/age, Envoy Gateway, podinfo workload |
+| 06 | [Observability](runbooks/06-observability.md) | kube-prometheus-stack via Flux, Grafana route, Prometheus targets |
 
 ## ADRs (why)
 
@@ -34,7 +35,7 @@ decisions.
 | Doc | What |
 |---|---|
 | [System inventory](system-inventory.md) | verified host + cluster + workspace state |
-| [Roadmap](roadmap.md) | Phase 3–8 forward plan + open decisions |
+| [Roadmap](roadmap.md) | phase plan (remaining: 7–8) + decision log |
 | [Troubleshooting log](troubleshooting-log.md) | every real failure: symptom → cause → fix → lesson |
 
 ## Code / config
@@ -43,11 +44,11 @@ decisions.
 |---|---|
 | [`../scripts/`](../scripts) | phase scripts (`preflight`, `10-`, `20-`, `30-`, `40-`) |
 | [`../inventory/nodes.yml`](../inventory/nodes.yml) | node addresses, roles, resources |
-| [`../terraform/`](../terraform) | libvirt `k8s` network XML (Terraform code pending) |
-| [`../ansible/`](../ansible) | node config as code (pending) |
+| [`../terraform/`](../terraform) | libvirt `k8s` network XML (Terraform deferred — [ADR-0005](adr/0005-no-ansible-node-config.md)) |
+| [`../ansible/`](../ansible) | dropped — node config stays scripted ([ADR-0005](adr/0005-no-ansible-node-config.md)) |
 | [`../config/k9s/`](../config/k9s) | k9s config, hotkeys, gruvbox skin (mounted via `K9S_CONFIG_DIR`) |
 | [`../clusters/`](../clusters) | Flux app-of-apps (`clusters/k8s-homelab/`) |
-| [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway) |
+| [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring) |
 | [`../apps/`](../apps) | workloads (podinfo) with encrypted secrets |
 | [`../.devcontainer/`](../.devcontainer) | `Containerfile` + `devcontainer.json` |
 
