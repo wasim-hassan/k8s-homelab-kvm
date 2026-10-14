@@ -9,15 +9,14 @@ spec:
   chartRef:
     kind: OCIRepository
     name: gateway-helm
-  upgrade:
-    strategy:
-      name: RetryOnFailure
-      retryInterval: 5m
   install:
     crds: Create
   upgrade:
     crds: CreateReplace
     cleanupOnFail: true
+    strategy:
+      name: RetryOnFailure
+      retryInterval: 5m
   values:
     deployment:
       envoyGateway:
