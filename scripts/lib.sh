@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ==================================== #
+#   k8s-homelab-kvm                    #
+#   scripts/lib.sh                     #
+#   wasim hassan                       #
+# ==================================== #
 #
 # lib.sh — shared helpers for the k8s-homelab-kvm scripts.
 #
@@ -11,14 +16,14 @@
 # The inventory is the single source of truth for node names, IPs, and roles.
 # Nothing in the sibling scripts hardcodes a hostname or address.
 
-# ── Paths ────────────────────────────────────────────────────────────────
+# ---- Paths ----
 # Resolve the repo root from this file's own location, so scripts work
 # regardless of the caller's cwd.
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$LIB_DIR/.." && pwd)"
 INVENTORY="$REPO_DIR/inventory/nodes.yml"
 
-# ── Console output ───────────────────────────────────────────────────────
+# ---- Console output ----
 if [[ -t 1 ]]; then
   C_RED=$'\033[31m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'
   C_BLUE=$'\033[34m'; C_BOLD=$'\033[1m'; C_OFF=$'\033[0m'
@@ -35,6 +40,18 @@ warn()    {             printf '  %s!%s %s\n' "$C_YELLOW" "$C_OFF" "$1"; }
 info()    {             printf '  %s→%s %s\n' "$C_BLUE" "$C_OFF" "$1"; }
 section() {             printf '\n%s%s%s\n' "$C_BOLD" "$1" "$C_OFF"; }
 
+# ---- fedora-style aliases (house style) ----
+# Cosmetic aliases so these scripts read in the same house style as the
+# author's other repos. Behaviour is unchanged: success/error share the
+# ok/bad PASS/FAIL counters.
+heading()      { printf '\n%s==== %s ====%s\n' "$C_BOLD" "$1" "$C_OFF"; }
+success()      { ok "$@"; }
+error()        { bad "$@"; }
+skip()         { printf '  %s-%s %s\n' "$C_YELLOW" "$C_OFF" "$1"; }
+verify_msg()   { printf '  %s✓%s %s\n' "$C_GREEN" "$C_OFF" "$1"; }
+complete_msg() { printf '\n%s%s%s\n' "$C_GREEN" "$1" "$C_OFF"; }
+logged()       { [[ -n "${LOGFILE:-}" ]] && printf '  %s→%s Log: %s\n' "$C_BLUE" "$C_OFF" "$LOGFILE"; return 0; }
+
 die() { printf '\n%serror:%s %s\n\n' "$C_RED" "$C_OFF" "$1" >&2; exit 1; }
 
 summary() {
@@ -47,7 +64,7 @@ summary() {
   return 0
 }
 
-# ── Inventory ────────────────────────────────────────────────────────────
+# ---- Inventory ----
 # Emit one line per host, pipe-delimited, newest order from nodes.yml:
 #   name|ip|user|role|memory_mib|key
 # Consumed with `while IFS='|' read -r ...`.
@@ -87,7 +104,7 @@ inv_role_one() {
   inv_role "$1" | head -1
 }
 
-# ── SSH ──────────────────────────────────────────────────────────────────
+# ---- SSH ----
 # Run a command on a node as the login user. Non-interactive: fail rather
 # than prompt for a password.
 # -n is important: without it ssh reads the local stdin and will swallow
@@ -141,7 +158,7 @@ module_present() {
   ssh_node "$name" "lsmod | grep -qE '^$mod ' || [ -d /sys/module/$mod ]" 2>/dev/null
 }
 
-# ── k3s binary staging ───────────────────────────────────────────────────
+# ---- k3s binary staging ----
 # GitHub release downloads of the k3s binary (~78 MiB) can be very slow or
 # stall from inside the VMs. Downloading once on the host, verifying it, and
 # pushing it over the local libvirt bridge is both faster and checked.
@@ -200,7 +217,7 @@ k3s_binary_push() {
   return 0
 }
 
-# ── Guards ───────────────────────────────────────────────────────────────
+# ---- Guards ----
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }

@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ==================================== #
+#   k8s-homelab-kvm                    #
+#   scripts/30-join-worker.sh          #
+#   wasim hassan                       #
+# ==================================== #
 #
 # 30-join-worker.sh — join every worker node to the k3s cluster.
 #
@@ -17,6 +22,8 @@
 
 set -uo pipefail
 
+APP_NAME="Join k3s workers"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 source "$SCRIPT_DIR/lib.sh"
@@ -30,19 +37,25 @@ cp_node=$(inv_role_one control-plane | awk -F'|' '{print $1}')
 cp_ip=$(inv_role_one control-plane | awk -F'|' '{print $2}')
 [[ -n "$cp_node" ]] || die "no control-plane node found in $INVENTORY"
 
+heading "$APP_NAME"
+
 section "Joining workers to $cp_node ($cp_ip)"
 assert_passwordless_sudo "$cp_node"
 
-# ── Fetch join credentials from the server ───────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# STEP 1: JOIN CREDENTIALS
+# ═══════════════════════════════════════════════════════════════
 TOKEN=$(ssh_node "$cp_node" 'sudo -n cat /var/lib/rancher/k3s/server/node-token' 2>/dev/null)
 if [[ -z "$TOKEN" ]]; then
   die "could not read node token from $cp_node — is the server installed? (run 20-install-k3s-server.sh)"
 fi
-ok "retrieved node token from $cp_node"
+success "retrieved node token from $cp_node"
 
 K3S_URL="https://$cp_ip:6443"
 
-# ── Join each worker ─────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# STEP 2: JOIN WORKERS
+# ═══════════════════════════════════════════════════════════════
 worker_count=0
 while IFS='|' read -r node ip _ role _ _; do
   [[ -z "$node" ]] && continue
@@ -52,30 +65,30 @@ while IFS='|' read -r node ip _ role _ _; do
   assert_passwordless_sudo "$node"
 
   if ! ssh_node "$node" true 2>/dev/null; then
-    bad "$node unreachable over SSH"
+    error "$node unreachable over SSH"
     continue
   fi
-  ok "$node reachable"
+  success "$node reachable"
 
   for chk in overlay br_netfilter nf_conntrack; do
     if ssh_node "$node" "cat /sys/module/$chk/initstate 2>/dev/null | grep -q live"; then
-      ok "module $chk loaded"
+      success "module $chk loaded"
     else
-      bad "module $chk not loaded — run ./scripts/10-prepare-nodes.sh first"
+      error "module $chk not loaded — run ./scripts/10-prepare-nodes.sh first"
     fi
   done
 
   installed=$(ssh_node "$node" 'command -v k3s >/dev/null 2>&1 && k3s --version 2>/dev/null | awk "{print \$3}"' || true)
   if [[ "$installed" == "$K3S_VERSION" ]]; then
-    ok "k3s $K3S_VERSION already installed (skipping installer)"
+    success "k3s $K3S_VERSION already installed (skipping installer)"
   else
     [[ -n "$installed" ]] && info "found existing k3s $installed — reinstalling at $K3S_VERSION"
 
     bin=$(k3s_binary_ensure "$K3S_VERSION") || continue
     if k3s_binary_push "$node" "$bin"; then
-      ok "staged k3s binary at $node:/usr/local/bin/k3s"
+      success "staged k3s binary at $node:/usr/local/bin/k3s"
     else
-      bad "could not push k3s binary to $node"
+      error "could not push k3s binary to $node"
       continue
     fi
 
@@ -90,14 +103,16 @@ curl -sfL https://get.k3s.io | \
   sh -s - agent --node-name "$node_name" --node-ip "$node_ip"
 REMOTE
     then
-      ok "k3s agent installed"
+      success "k3s agent installed"
     else
-      bad "$node agent installer failed — see output above"
+      error "$node agent installer failed — see output above"
       continue
     fi
   fi
 
-  # ── Wait for the agent service ─────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════
+  # STEP 3: WAIT FOR AGENT
+  # ═══════════════════════════════════════════════════════════════
   info "waiting for k3s-agent.service (up to 90s)"
   agent_up=0
   for _ in $(seq 1 45); do
@@ -108,9 +123,9 @@ REMOTE
   done
 
   if [[ $agent_up -eq 1 ]]; then
-    ok "k3s-agent.service active on $node"
+    success "k3s-agent.service active on $node"
   else
-    bad "$node k3s-agent.service not active — check: ssh $node 'sudo journalctl -u k3s-agent -n 50'"
+    error "$node k3s-agent.service not active — check: ssh $node 'sudo journalctl -u k3s-agent -n 50'"
   fi
 done < <(inv_role worker)
 
@@ -118,7 +133,9 @@ if [[ $worker_count -eq 0 ]]; then
   die "no worker nodes found in $INVENTORY under k8s_workers"
 fi
 
-# ── Let the API settle, then report node states ──────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# STEP 4: CLUSTER STATUS
+# ═══════════════════════════════════════════════════════════════
 section "Cluster nodes"
 info "waiting for nodes to register (up to 90s)"
 for _ in $(seq 1 45); do
@@ -133,13 +150,20 @@ if kubectl get nodes >/dev/null 2>&1; then
   kubectl get nodes -o wide 2>/dev/null | sed 's/^/      /'
   notready=$(kubectl get nodes --no-headers 2>/dev/null | grep -vc ' Ready ')
   if [[ "$notready" -eq 0 ]]; then
-    ok "all nodes Ready"
+    success "all nodes Ready"
   else
-    bad "$notready node(s) not Ready"
+    error "$notready node(s) not Ready"
   fi
 else
-  bad "cannot reach the cluster API from this host"
+  error "cannot reach the cluster API from this host"
 fi
+
+# ═══════════════════════════════════════════════════════════════
+# COMPLETION
+# ═══════════════════════════════════════════════════════════════
 
 section "Result"
 summary
+_exit_status=$?
+complete_msg "$APP_NAME completed"
+exit "$_exit_status"

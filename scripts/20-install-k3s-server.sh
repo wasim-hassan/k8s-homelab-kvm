@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# ==================================== #
+#   k8s-homelab-kvm                    #
+#   scripts/20-install-k3s-server.sh   #
+#   wasim hassan                       #
+# ==================================== #
 #
 # 20-install-k3s-server.sh — install k3s server on the control-plane node
 #                           and pull a working kubeconfig onto this host.
@@ -24,6 +29,8 @@
 
 set -uo pipefail
 
+APP_NAME="Install k3s server"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib.sh
 source "$SCRIPT_DIR/lib.sh"
@@ -38,33 +45,39 @@ node=$(inv_role_one control-plane | awk -F'|' '{print $1}')
 ip=$(inv_role_one control-plane | awk -F'|' '{print $2}')
 [[ -n "$node" ]] || die "no control-plane node found in $INVENTORY"
 
+heading "$APP_NAME"
+
 section "k3s server install — $node ($ip)"
 info "target version: $K3S_VERSION"
 assert_passwordless_sudo "$node"
 
-# ── Preflight ────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# STEP 1: PREFLIGHT
+# ═══════════════════════════════════════════════════════════════
 for chk in overlay br_netfilter nf_conntrack; do
   if ssh_node "$node" "cat /sys/module/$chk/initstate 2>/dev/null | grep -q live"; then
-    ok "module $chk loaded"
+    success "module $chk loaded"
   else
-    bad "module $chk not loaded — run ./scripts/10-prepare-nodes.sh first"
+    error "module $chk not loaded — run ./scripts/10-prepare-nodes.sh first"
   fi
 done
 
 if [[ "$(ssh_node "$node" 'sysctl -n net.ipv4.ip_forward')" == "1" ]]; then
-  ok "net.ipv4.ip_forward=1"
+  success "net.ipv4.ip_forward=1"
 else
-  bad "net.ipv4.ip_forward != 1 — run ./scripts/10-prepare-nodes.sh first"
+  error "net.ipv4.ip_forward != 1 — run ./scripts/10-prepare-nodes.sh first"
 fi
 
 if ! ssh_node "$node" true 2>/dev/null; then
   die "$node unreachable — cannot continue"
 fi
 
-# ── Install (skip if already at version) ─────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# STEP 2: INSTALL K3S SERVER
+# ═══════════════════════════════════════════════════════════════
 installed=$(ssh_node "$node" 'command -v k3s >/dev/null 2>&1 && k3s --version 2>/dev/null | awk "{print \$3}"' || true)
 if [[ "$installed" == "$K3S_VERSION" ]]; then
-  ok "k3s $K3S_VERSION already installed on $node (skipping installer)"
+  success "k3s $K3S_VERSION already installed on $node (skipping installer)"
 else
   [[ -n "$installed" ]] && info "found existing k3s $installed — upgrading to $K3S_VERSION"
 
@@ -72,9 +85,9 @@ else
   # node download it — GitHub release speed from the VMs is unreliable.
   bin=$(k3s_binary_ensure "$K3S_VERSION") || exit 1
   if k3s_binary_push "$node" "$bin"; then
-    ok "staged k3s binary at $node:/usr/local/bin/k3s"
+    success "staged k3s binary at $node:/usr/local/bin/k3s"
   else
-    bad "could not push k3s binary to $node"
+    error "could not push k3s binary to $node"
     summary; exit 1
   fi
 
@@ -90,14 +103,16 @@ curl -sfL https://get.k3s.io | \
   sh -s - "$@"
 REMOTE
   then
-    ok "k3s server installed"
+    success "k3s server installed"
   else
-    bad "k3s installer failed — see output above"
+    error "k3s installer failed — see output above"
     summary; exit 1
   fi
 fi
 
-# ── Wait for the API server to answer ────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# STEP 3: WAIT FOR API SERVER
+# ═══════════════════════════════════════════════════════════════
 info "waiting for the API server (up to 90s)"
 ready=0
 for _ in $(seq 1 45); do
@@ -111,13 +126,15 @@ for _ in $(seq 1 45); do
 done
 
 if [[ $ready -eq 1 ]]; then
-  ok "k3s.service active on $node"
+  success "k3s.service active on $node"
 else
-  bad "k3s.service did not become active — check: ssh $node 'sudo journalctl -u k3s -n 50'"
+  error "k3s.service did not become active — check: ssh $node 'sudo journalctl -u k3s -n 50'"
   summary; exit 1
 fi
 
-# ── Fetch + rewrite kubeconfig ───────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# STEP 4: KUBECONFIG
+# ═══════════════════════════════════════════════════════════════
 section "kubeconfig"
 mkdir -p "$HOME/.kube"
 chmod 700 "$HOME/.kube"
@@ -136,28 +153,39 @@ if ssh_node "$node" 'cat /etc/rancher/k3s/k3s.yaml' >"$KUBECONFIG_PATH.tmp" 2>/d
   sed -i "s|server: https://127.0.0.1:6443|server: https://$ip:6443|" "$KUBECONFIG_PATH.tmp"
   mv "$KUBECONFIG_PATH.tmp" "$KUBECONFIG_PATH"
   chmod 600 "$KUBECONFIG_PATH"   # cluster-admin credential
-  ok "kubeconfig written to $KUBECONFIG_PATH (server https://$ip:6443, mode 600)"
+  success "kubeconfig written to $KUBECONFIG_PATH (server https://$ip:6443, mode 600)"
 else
   rm -f "$KUBECONFIG_PATH.tmp"
-  bad "could not read /etc/rancher/k3s/k3s.yaml from $node"
+  error "could not read /etc/rancher/k3s/k3s.yaml from $node"
 fi
 
-# ── Verify API reachability from the host ────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# STEP 5: VERIFY
+# ═══════════════════════════════════════════════════════════════
 section "Verification"
 if kubectl --request-timeout=10s get nodes >/dev/null 2>&1; then
-  ok "host kubectl can reach the cluster API"
+  success "host kubectl can reach the cluster API"
   kubectl get nodes -o wide 2>/dev/null | sed 's/^/      /'
   if kubectl get node "$node" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
-    ok "$node is Ready"
+    success "$node is Ready"
   else
     warn "$node not Ready yet — add-ons may still be starting"
   fi
 else
-  bad "host kubectl cannot reach the API — check https://$ip:6443 reachability"
+  error "host kubectl cannot reach the API — check https://$ip:6443 reachability"
 fi
 
-# ── Record the node join token location for the worker step ──────────────
+# ═══════════════════════════════════════════════════════════════
+# STEP 6: NEXT STEPS
+# ═══════════════════════════════════════════════════════════════
 info "worker join reads the token from $node:/var/lib/rancher/k3s/server/node-token"
+
+# ═══════════════════════════════════════════════════════════════
+# COMPLETION
+# ═══════════════════════════════════════════════════════════════
 
 section "Result"
 summary
+_exit_status=$?
+complete_msg "$APP_NAME completed"
+exit "$_exit_status"
