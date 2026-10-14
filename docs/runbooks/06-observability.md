@@ -5,7 +5,7 @@ declaratively through Flux, expose Grafana at `grafana.local` through the existi
 Envoy Gateway, and prove Prometheus scrapes the cluster — all sized for a 2-node
 lab (3 GiB + 1536 MiB).
 
-**Scope:** documents what exists in the repo and cluster at `main@sha1:1f798951`
+**Scope:** documents what exists in the repo and cluster at `main@sha1:9550bb43`
 (HEAD 2026-10-15). Alertmanager is intentionally **disabled** (no notification
 target; saves memory).
 
@@ -35,6 +35,15 @@ target; saves memory).
   - `prometheus.prometheusSpec`: `retention: 6h`, `retentionSize: 1500MB`,
     requests/limits, and a 2Gi `volumeClaimTemplate` on `local-path`
   - explicit requests/limits for operator, Grafana, kube-state-metrics, node-exporter
+  - `grafana.resources` = `100m/256Mi` requests, `500m/512Mi` limits, and
+    `grafana.sidecar.resources` = `64Mi`/`128Mi` for the dashboard/datasource
+    sidecars (Grafana 13 indexes dashboards in memory — a 256Mi limit OOMKills
+    it; see the troubleshooting log)
+  - `kubeEtcd`, `kubeControllerManager`, `kubeScheduler`, `kubeProxy` →
+    `enabled: false`. k3s uses a **SQLite** datastore and embeds the control
+    plane, so these ServiceMonitors have no endpoints and the stock dashboards
+    would only ever show "No data". Disabling them also removes their
+    ServiceMonitors + dashboards (12→8 monitors, 28→24 dashboards).
   - `grafana.fullnameOverride: grafana` (stable Service name for the route)
 
 ### 2. Manifests (all under `infrastructure/monitoring/`)
@@ -109,8 +118,31 @@ devpod ssh k8s-homelab-kvm --command 'kubectl top nodes'
 - HelmRelease `kube-prometheus-stack` **Ready** (chart 92.7.0)
 - Pods: Grafana 13.2.4, Prometheus v3.15.0, operator v0.94.1, kube-state-metrics v2.20.0, node-exporter v1.12.1
 - Prometheus: 15/15 targets `up`; PVC `prometheus-...-0` Bound (2Gi, `local-path`)
-- Grafana reachable at `grafana.local` (HTTP 200)
-- All Kustomizations Ready at `main@sha1:1f798951`
+- Grafana reachable at `grafana.local` (HTTP 200); **24** dashboards provisioned
+- All Kustomizations Ready at `main@sha1:9550bb43`
+
+## Access the UIs
+
+**Grafana** — via the Gateway. Add the host to your workstation's `/etc/hosts`
+(one-time, needs sudo):
+```
+192.168.123.11 grafana.local
+```
+Then browse to <http://grafana.local> and log in as `admin` with the password
+from the SOPS secret:
+```bash
+devpod ssh k8s-homelab-kvm --command \
+  "kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d"
+```
+
+**Prometheus** — not exposed through the Gateway (ClusterIP only). Reach the UI
+with a port-forward tunnel from your workstation:
+```bash
+devpod ssh k8s-homelab-kvm \
+  -L 9090:127.0.0.1:9090 \
+  --command 'kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090:9090'
+# then browse to http://localhost:9090
+```
 
 ## Troubleshooting (recorded)
 
@@ -119,6 +151,12 @@ See [`troubleshooting-log.md`](../troubleshooting-log.md) for the full entries:
   field; the retry strategy belongs at `spec.upgrade.strategy`. Fixed in `1f79895`.
 - **`flux reconcile` appears to hang** — it blocks until the Kustomization is
   ready; poll `flux get kustomizations` in a loop instead of a single blocking call.
+- **Grafana OOMKilled → Envoy `upstream connect error` on Dashboard pages** —
+  the `256Mi` limit was too low for Grafana 13's in-memory dashboard index;
+  raised to `512Mi`. Fixed in `9550bb4`.
+- **etcd / scheduler / controller-manager dashboards show "No data"** — k3s has
+  no etcd and does not expose those metrics; disabled via the component flags in
+  `9550bb4`.
 
 ## GitOps notes
 

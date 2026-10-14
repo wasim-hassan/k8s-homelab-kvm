@@ -821,3 +821,67 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
 - **Lesson:** `flux reconcile` waits; for slow Helm installs, poll status rather
   than wrapping the reconcile in a short timeout.
 
+## 2026-10-15 — Grafana OOMKilled → Envoy "upstream connect error" on the Dashboards page
+
+- **Symptom:** Opening Grafana's **Dashboards** section returned
+  `upstream connect error or disconnect/reset before headers (reset reason:
+  remote connection failure)` and scattered "error loading" messages.
+- **Investigation:**
+  ```bash
+  kubectl -n monitoring describe pod -l app.kubernetes.io/name=grafana
+  # Last State: Terminated, Reason: OOMKilled, Exit Code: 137
+  kubectl -n monitoring top pod -l app.kubernetes.io/name=grafana --containers
+  # grafana 250Mi  (limit was 256Mi)  → pinned at the cap
+  kubectl -n monitoring logs -l app.kubernetes.io/name=grafana -c grafana | grep bleve
+  # logger=bleve-backend ... resource=dashboards reason=getStats "Building index using memory"
+  ```
+- **Root cause:** Grafana 13 builds an **in-memory search index** (bleve) over
+  all provisioned dashboards. Loading the dashboard list spiked memory past the
+  `256Mi` limit → the container was OOMKilled (exit 137) → Envoy had no healthy
+  backend and returned the 5xx. (Restart count was 2; `kubectl top pod` showed
+  398Mi because that number is the **pod total**: grafana 250Mi + two sidecars
+  ~76Mi each.)
+- **Fix:** Raised Grafana to `requests 256Mi` / `limits 512Mi` and bounded the
+  dashboard/datasource sidecars via `grafana.sidecar.resources`
+  (`64Mi`/`128Mi`). Commit `9550bb4` — values in
+  `infrastructure/monitoring/helmrelease.yaml`.
+- **Verify:**
+  ```bash
+  kubectl -n monitoring top pod -l app.kubernetes.io/name=grafana --containers
+  # grafana ~317Mi (< 512Mi), restartCount 0
+  curl -s -H 'Host: grafana.local' http://192.168.123.11/api/health   # {"database":"ok",...}
+  ```
+- **Lesson:** On a small cluster it is tempting to set memory limits very low;
+  Grafana 13 is not as light as older versions (its new dashboard search indexes
+  in memory). `kubectl top pod` without `--containers` reports the **pod total**,
+  which can hide which container is actually at its ceiling — always add
+  `--containers` when chasing OOMKills.
+
+## 2026-10-15 — etcd / scheduler / controller-manager dashboards show "No data"
+
+- **Symptom:** In Grafana, the **etcd** dashboard (and likely scheduler /
+  controller-manager / proxy) showed `No data` on every panel.
+- **Root cause:** k3s uses a **SQLite datastore by default** and embeds the
+  control-plane components inside the `k3s server`/`agent` processes, so there is
+  no etcd and no exposed scheduler/controller-manager/kube-proxy metrics
+  endpoint. `kube-prometheus-stack` still ships ServiceMonitors + dashboards for
+  them, but their ServiceMonitors select **no endpoints**, so the panels have
+  nothing to query. (Confirmed: neither `/etc/etcd` nor a datastore flag exists,
+  and the Prometheus `job` list had no `kube-etcd`/`kube-scheduler`/etc.)
+- **Fix:** Disabled the irrelevant components in the HelmRelease values
+  (`kubeEtcd`, `kubeControllerManager`, `kubeScheduler`, `kubeProxy` →
+  `enabled: false`). The chart gates both the ServiceMonitors **and** the
+  dashboards on these flags, so this removed 4 ServiceMonitors (12→8) and 4
+  dashboards (28→24).
+- **Verify:**
+  ```bash
+  kubectl -n monitoring get servicemonitors            # 8, none etcd/scheduler/cm/proxy
+  kubectl -n monitoring get cm -l grafana_dashboard=1  # 24
+  curl -s -u admin:<pw> -H 'Host: grafana.local' \
+    'http://192.168.123.11/api/search?type=dash-db'    # no etcd/scheduler/cm/proxy
+  ```
+- **Lesson:** Match a monitoring stack to what the distribution actually runs.
+  k3s is not upstream Kubernetes — control-plane components are internal, so
+  their stock dashboards are dead weight. Turning off the components keeps the
+  Prometheus target list honest.
+

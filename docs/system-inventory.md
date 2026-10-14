@@ -445,7 +445,7 @@ Verified 2026-10-15, reconciled at `main@sha1:46196596`.
 
 ### Monitoring (Phase 6 — observability)
 
-Verified 2026-10-15, reconciled at `main@sha1:1f798951`.
+Verified 2026-10-15, reconciled at `main@sha1:9550bb43`.
 
 | Item | Value |
 |---|---|
@@ -453,10 +453,14 @@ Verified 2026-10-15, reconciled at `main@sha1:1f798951`.
 | Delivery | HelmRelease `kube-prometheus-stack` in `monitoring` — `Ready=True` |
 | Prometheus | **v3.15.0**; retention `6h` / `1500MB`; PVC 2Gi on `local-path` (Bound) |
 | Grafana | **13.2.4** (distroless), Service `grafana:80`, route host `grafana.local` |
+| Grafana resources | `requests 100m/256Mi`, `limits 500m/512Mi`; sidecars `64Mi`/`128Mi` (raised 2026-10-15 after an OOMKill — commit `9550bb4`) |
 | operator | `prometheus-operator` v0.94.1 |
 | kube-state-metrics | v2.20.0 |
 | node-exporter | v1.12.1 (DaemonSet, 1 per node) |
 | Alertmanager | **disabled** (no notification target; saves memory) |
+| k3s control-plane monitors | et **disabled** — `kubeEtcd`/`kubeControllerManager`/`kubeScheduler`/`kubeProxy` off (k3s uses SQLite and embeds the control plane; no endpoints) |
 | Targets | 15 active, **15 up** |
+| ServiceMonitors | 8 |
+| Dashboards | 24 provisioned ConfigMaps (`grafana_dashboard=1`) |
 | Secret | SOPS-encrypted `grafana-admin` (`admin-user` / `admin-password`) |
 | Manifests | [`../infrastructure/monitoring/`](../infrastructure/monitoring) |
