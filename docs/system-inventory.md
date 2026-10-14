@@ -445,7 +445,7 @@ Verified 2026-10-15, reconciled at `main@sha1:46196596`.
 
 ### Monitoring (Phase 6 — observability)
 
-Verified 2026-10-15, reconciled at `main@sha1:9550bb43`.
+Verified 2026-10-15, reconciled at `main@sha1:e535a647`.
 
 | Item | Value |
 |---|---|
@@ -453,7 +453,7 @@ Verified 2026-10-15, reconciled at `main@sha1:9550bb43`.
 | Delivery | HelmRelease `kube-prometheus-stack` in `monitoring` — `Ready=True` |
 | Prometheus | **v3.15.0**; retention `6h` / `1500MB`; PVC 2Gi on `local-path` (Bound) |
 | Grafana | **13.2.4** (distroless), Service `grafana:80`, route host `grafana.local` |
-| Grafana resources | `requests 100m/256Mi`, `limits 500m/512Mi`; sidecars `64Mi`/`128Mi` (raised 2026-10-15 after an OOMKill — commit `9550bb4`) |
+| Grafana resources | `requests 100m/384Mi`, `limits 500m/768Mi`; sidecars `64Mi`/`128Mi` (raised 2026-10-15 to 768Mi for headroom after near-limit usage — commits `e535a64`, earlier `9550bb4`) |
 | operator | `prometheus-operator` v0.94.1 |
 | kube-state-metrics | v2.20.0 |
 | node-exporter | v1.12.1 (DaemonSet, 1 per node) |

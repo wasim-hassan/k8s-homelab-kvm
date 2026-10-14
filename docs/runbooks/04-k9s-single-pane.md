@@ -40,8 +40,8 @@ project.
 
 | File | Purpose |
 |---|---|
-| `config/k9s/config.yaml` | skin, refresh rate, CPU/MEM thresholds, log view |
-| `config/k9s/hotkeys.yaml` | one-key jumps (see table below) |
+| `config/k9s/config.yaml` | skin, refresh rate, CPU/MEM thresholds (warn 80/crit 90), log view |
+| `config/k9s/hotkeys.yaml` | one-key jumps (Shift-0..5, Shift-X, Shift-H) |
 | `config/k9s/skins/gruvbox-dark-hard.yaml` | gruvbox skin (vendored, Apache-2.0) |
 | `config/k9s/clusters/default/default/config.yaml` | start on **all** namespaces, view `pods` |
 
@@ -54,7 +54,9 @@ The `clusters/<context>/<cluster>/` path is `<context>` = `default` and
 - `K9S_CONFIG_DIR=/home/dev/.config/k9s` (in both `containerEnv` and `remoteEnv`)
 
 > Because the mount **replaces** the whole config dir, changes to any file above
-> are picked up on the next k9s launch — no rebuild needed.
+> are picked up on the next k9s launch — no rebuild needed. Kubernetes
+> namespaces are flat (no hierarchy); favorites trimmed to `all`, `kube-system`,
+> `monitoring` to keep the UI minimal.
 
 ---
 
@@ -84,6 +86,7 @@ but the config already makes that the default.)
 | `Shift-3` | Services |
 | `Shift-4` | Events |
 | `Shift-5` | Namespaces |
+| `Shift-X` | **XRay Deployments** (tree: `Deployment → ReplicaSet → Pod`) — `xray deploy` |
 | `Shift-H` | **Cluster health** (`:pulses`) |
 
 ---
@@ -122,7 +125,7 @@ but the config already makes that the default.)
 | Config & secrets | `:cm`, `:secret` |
 | What just happened | `Shift-4` / `:events` |
 | Cluster down / health | `Shift-H` (`:pulses`) |
-| Resource relationships | `:xray <resource>` |
+| Resource relationships | `:xray <resource>` (e.g. `:xray deploy`) |
 
 ---
 
