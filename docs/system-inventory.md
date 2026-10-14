@@ -3,7 +3,7 @@
 Verified state of the host and cluster. Every value below was confirmed by running
 the command shown, not assumed.
 
-Last verified: 2026-10-14
+Last verified: 2026-10-15
 
 ---
 
@@ -379,7 +379,7 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 | 2 | k9s single pane (repo-hosted config, gruvbox, mounted via `K9S_CONFIG_DIR`) | ✅ done |
 | 3 | GitOps tooling in workspace (`flux` v2.9.6, `sops` v3.13.3, `age` v1.3.1) | ✅ done |
 | 3 | age key + [`.sops.yaml`](../.sops.yaml); SOPS round-trip verified | ✅ done |
-| 3 | `flux bootstrap github` → Flux controllers in-cluster | ⏳ next |
+| 3 | `flux bootstrap github` → Flux controllers in-cluster + SOPS/age wired + Envoy Gateway + podinfo | ✅ done |
 
 ### Deferred / not yet done
 
@@ -389,7 +389,45 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 - Host trash is **empty** (0 B) as of 2026-10-12.
 - `~/.cache/k3s-homelab/k3s-v1.37.1+k3s1` (78 MiB, verified) is **retained** — it
   is bind-mounted read-only into the workspace.
-- Next: **Phase 3 (GitOps)** — decisions resolved 2026-10-14 (skip Cilium,
-  private GitHub, Envoy Gateway). Workspace tooling and the age key are in place;
-  next is `flux bootstrap github`, then Envoy Gateway via Flux and the first
-  workload. See the [roadmap](roadmap.md#phase-3--gitops-foundation).
+- Next: **Phase 6 (Observability)** — resolve [Decision 4](roadmap.md#still-open--decision-4--observability-sizing)
+  (sizing) first, then deploy Prometheus/Grafana via Flux. Phase 5 (IaC) is an
+  unblocked parallel option. Phase 3 is complete — see
+  [runbook 05](runbooks/05-gitops-flux.md).
+
+---
+
+## GitOps state (Phase 3 — Flux CD)
+
+Verified 2026-10-15, reconciled at `main@sha1:46196596`.
+
+| Item | Value |
+|---|---|
+| Flux version | **v2.9.6** (source / kustomize / helm / notification controllers) |
+| Bootstrap | `flux bootstrap github` (read-only **deploy key**, `--token-auth=false`) |
+| Git source | `ssh://git@github.com/wasim-hassan/k8s-homelab-kvm` (branch `main`, path `clusters/k8s-homelab`) |
+| App-of-apps | [`../clusters/k8s-homelab/`](../clusters/k8s-homelab) — `flux-system` + `infrastructure.yaml` + `apps.yaml` |
+| Kustomizations | `flux-system`, `infrastructure`, `apps` — all `Ready=True` |
+| SOPS decryption | `spec.decryption` (`provider: sops`, `secretRef: sops-age`) on `infrastructure` + `apps` |
+
+### Envoy Gateway (infrastructure)
+
+| Item | Value |
+|---|---|
+| Version | **v1.9.2** (chart `1.9.2+be034275b55d`) |
+| Source | OCIRepository `gateway-helm` → `oci://docker.io/envoyproxy/gateway-helm` |
+| Delivery | HelmRelease `envoy-gateway` (releaseName `eg`) in `envoy-gateway-system` |
+| GatewayClass | `eg` — `Accepted=True` |
+| Gateway | `eg` — `Programmed=True`, address **`192.168.123.11`** |
+| Manifests | [`../infrastructure/envoy-gateway/`](../infrastructure/envoy-gateway) |
+
+### First workload (podinfo)
+
+| Item | Value |
+|---|---|
+| Namespace | `podinfo` |
+| Image | `ghcr.io/stefanprodan/podinfo:6.7.1` |
+| Resources | requests `cpu 10m / mem 32Mi`; limits `cpu 200m / mem 64Mi` |
+| Service | ClusterIP `80` → container `9898` |
+| Routing | HTTPRoute `podinfo` host `podinfo.local` → Gateway `eg`; ReferenceGrant `allow-podinfo-to-gateway` |
+| Secret | SOPS-encrypted `podinfo-message` (decrypted in-cluster) → `PODINFO_UI_MESSAGE` |
+| Manifests | [`../apps/podinfo/`](../apps/podinfo) |

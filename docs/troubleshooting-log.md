@@ -753,3 +753,35 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
 | Put an un-escaped multi-line `{ … }` block in a `RUN` line | End every physical line with `\`, or use `printf '%s\n'` |
 | Mount host creds into a rootless-Podman container without `keep-id` | Add `--userns=keep-id` **and** `--security-opt=label=disable` |
 | Run `kubectl`-dependent scripts on the bare host | Run them inside the workspace |
+
+---
+
+## 2026-10-14 — Flux: `HelmRelease` rejected (`duplicate upgrade key`)
+
+- **Symptom:** `kustomize build failed` for Kustomization `infrastructure` after
+  adding the Envoy Gateway manifests (revision `main@sha1:8c55a7a`). Event:
+  `line 18: mapping key "upgrade" already defined at line 12`.
+- **Root cause:** `infrastructure/envoy-gateway/helmrelease.yaml` contained two
+  `upgrade:` blocks (duplicate YAML key).
+- **Fix:** Removed the first `upgrade:` block; consolidated into a single
+  `upgrade:` (`strategy: RetryOnFailure` + `crds: CreateReplace` /
+  `cleanupOnFail`). Commit `4619659`; `flux reconcile kustomization infrastructure
+  -n flux-system`.
+- **Verify:** `flux get kustomization infrastructure` → `Ready=True` at
+  `main@sha1:46196596`.
+- **Lesson:** Duplicate YAML keys slip in during manual edits and kustomize/Helm
+  is strict. Run `kustomize build` (or `flux build`) locally before committing.
+
+## 2026-10-14 — Post-reboot churn (`subnet.env`, CoreDNS, DNS lookups)
+
+- **Symptom:** After a VM reboot: `failed to load flannel 'subnet.env'`,
+  CoreDNS/metrics-server readiness probes failing, and Flux
+  `GitOperationFailed` with DNS lookups to `10.43.0.10:53`.
+- **Root cause:** CNI (Flannel) init and CoreDNS/kube-proxy startup churn right
+  after the nodes came up; cluster DNS was briefly unavailable.
+- **Fix:** None needed — self-healed within minutes as pods restarted.
+- **Verify:** `kubectl get pods -A` and `flux get kustomizations -A` all Ready;
+  both nodes Ready.
+- **Lesson:** Expect brief post-reboot churn on a small cluster. Wait and
+  re-check before force-restarting controllers.
+

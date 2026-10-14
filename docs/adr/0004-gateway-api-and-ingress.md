@@ -24,9 +24,10 @@ implementation. Two things are already true in this cluster:
    grpcroutes / tcproutes / tlsroutes / udproutes
    referencegrants / backendtlspolicies / listenersets
    ```
-   Verified with `kubectl get crd | grep -i gateway`. There is **no
-   GatewayClass** and no controller Deployment, so the CRDs are currently inert —
-   nothing is serving traffic.
+   Verified with `kubectl get crd | grep -i gateway`. At decision time there was
+   **no GatewayClass** and no controller Deployment, so the CRDs were inert.
+   > **Superseded 2026-10-15:** the controller is now installed — see
+   > [Verification (current state)](#verification-current-state) below.
 
 **Unrecorded provenance.** The Gateway API CRDs were installed out-of-band (a
 Helm Job, not one of this repo's scripts — `grep helm scripts/*` is empty). The
@@ -85,17 +86,26 @@ coupling to the skipped Cilium migration).
 
 ## Verification (current state)
 
+Implemented 2026-10-15 and reconciled by Flux at `main@sha1:46196596`:
+
 ```bash
-kubectl get crd | grep -i gateway        # CRDs present
-kubectl get gatewayclass                 # none (no controller installed)
-kubectl get pods -A | grep -iE 'ingress|gateway|traefik'   # no controller
+kubectl get crd | grep -i gateway                          # CRDs present
+kubectl get gatewayclass                                  # eg — Accepted=True
+kubectl get gateway -n envoy-gateway-system               # eg — Programmed=True, ADDRESS 192.168.123.11
+kubectl get pods -n envoy-gateway-system                  # envoy-gateway (controller) + envoy data plane Running
+kubectl get helmrelease -n envoy-gateway-system           # envoy-gateway — Ready (chart 1.9.2+be034275b55d)
 ```
+
+Manifests: [`infrastructure/envoy-gateway/`](../../infrastructure/envoy-gateway)
+(namespace, OCIRepository `gateway-helm` v1.9.2, HelmRelease, GatewayClass,
+Gateway), applied by the `infrastructure` Kustomization
+([runbook 05](../runbooks/05-gitops-flux.md)).
 
 ## Revisit when
 
-- **Done — Phase 3 (2026-10-14):** controller chosen = **Envoy Gateway**, to be
-  installed via Flux. Record the concrete chart version in
-  [system-inventory.md](../system-inventory.md) once installed.
+- **Done — Phase 3 (2026-10-15):** **Envoy Gateway** v1.9.2 installed via Flux;
+  GatewayClass `eg` Accepted, Gateway `eg` Programmed at `192.168.123.11`.
+  Version recorded in [system-inventory.md](../system-inventory.md).
 - Cilium ever gets scheduled — then reconsider whether Cilium should be the
   Gateway API controller, collapsing two decisions into one (currently skipped —
   see the [roadmap](../roadmap.md#resolved-decisions-2026-10-14)).

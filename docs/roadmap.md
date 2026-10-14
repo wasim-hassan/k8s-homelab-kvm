@@ -4,12 +4,16 @@ Forward plan for the homelab, phase by phase, with the decision points that
 block each phase. This is also the **resume point** for a new session: read the
 [Resume checklist](#resume-checklist) at the bottom.
 
-- **Last updated:** 2026-10-14
-- **Done so far:** Phases 0–2 (substrate, k3s cluster, operator workspace, k9s
-  single pane) — see [system-inventory.md](system-inventory.md#current-phase-status).
-- **Current focus:** Phase 3 (GitOps) — ✅ **decisions resolved**
-  ([below](#resolved-decisions-2026-10-14)); step 1 done 2026-10-14 (workspace
-  `flux`/`sops`/`age` + age key + `.sops.yaml`), next is `flux bootstrap github`.
+- **Last updated:** 2026-10-15
+- **Done so far:** Phases 0–3 (substrate, k3s cluster, operator workspace + k9s,
+  GitOps: Flux CD + SOPS/age, Envoy Gateway, first workload) — see
+  [system-inventory.md](system-inventory.md#current-phase-status).
+- **Current focus:** Phase 3 (GitOps) — ✅ **complete** 2026-10-15. Flux CD
+  bootstrapped (deploy key), SOPS/age decryption wired, Envoy Gateway installed
+  via Flux, and the first workload (podinfo) deployed with requests/limits and an
+  encrypted Secret. Next: Phase 6 (Observability) — resolve
+  [Decision 4](#still-open--decision-4--observability-sizing) (sizing) first; Phase 5 (IaC)
+  remains a parallel option.
 
 > Version numbers in this document were researched on 2026-10-13 and **will
 > drift**. Re-verify the exact tag/chart version at implementation time before
@@ -24,12 +28,12 @@ block each phase. This is also the **resume point** for a new session: read the
 | 0 | Substrate (KVM, libvirt, network, VMs, SSH) | ✅ done | — |
 | 1 | k3s cluster (control plane + worker, verified) | ✅ done | — |
 | 2 | Operator workspace (Devpod/Podman) + observability (k9s) | ✅ done | — |
-| **3** | **GitOps foundation (Flux + SOPS/age, ingress, first workload)** | ▶️ in progress | — (decisions resolved) |
+| **3** | **GitOps foundation (Flux + SOPS/age, ingress, first workload)** | ✅ done | — |
 | 4 | CNI migration → Cilium (+ Hubble) | 💤 skip for now | Decision 1 → **skip Cilium** |
 | 5 | IaC as code (Terraform libvirt + Ansible) | ⏳ | — |
 | 6 | Observability stack (Prometheus/Grafana/Alertmanager) | ⏳ | Decision 4 (sizing) |
 | 7 | Security hardening (RBAC, NetworkPolicy, PSS) | ⏳ | Phase 4 for NetworkPolicy |
-| 8 | CI/CD + image automation | ⏳ | Phase 3 |
+| 8 | CI/CD + image automation | ⏳ | — (Phase 3 done) |
 | — | Stretch: Talos, storage (Longhorn), backup (Velero) | 💤 later | — |
 
 ---
@@ -53,33 +57,34 @@ least-risky order.
 
 ## Phase 3 — GitOps foundation
 
+> **Status: ✅ complete (2026-10-15).** Implemented in
+> [`clusters/k8s-homelab/`](../clusters/k8s-homelab) (app-of-apps),
+> [`infrastructure/`](../infrastructure) (Envoy Gateway) and
+> [`apps/`](../apps) (podinfo). Procedure + verification:
+> [runbook 05](runbooks/05-gitops-flux.md).
+
 **Goal:** make the cluster declaratively reproducible from git, and deploy the
 first real workload.
 
 **Deliverables**
-1. **Flux CD** bootstrapped against the chosen git remote (Decision 2).
-   *Researched version:* Flux **v2.9.5**.
-2. **Secrets** with **SOPS + age** (FOSS, no cloud KMS). Generate an age key,
-   commit the encrypted secret to git, decrypt in-cluster with
-   `sops-age` / Flux `decryption` provider. (Both `sops` and `age` are currently
-   **absent** from the workspace — see
-   [system-inventory.md](system-inventory.md#not-yet-installed).)
-3. **Ingress/Gateway controller** installed *via* Flux, superseding
-   [ADR-0004](adr/0004-gateway-api-and-ingress.md) (Decision 3).
-4. **First workload** deployed declaratively (e.g. a small HTTP app), exposed
-   through the chosen controller, **with CPU/mem requests + limits** — this also
-   fixes the `n/a` columns currently shown in k9s.
+1. **Flux CD** bootstrapped (v2.9.6, read-only deploy key) against the private
+   GitHub remote; app-of-apps under `clusters/k8s-homelab/`. ✅
+2. **Secrets** with **SOPS + age** — age key generated, `sops-age` Secret in
+   `flux-system`, `spec.decryption` on the `infrastructure`/`apps`
+   Kustomizations. ✅
+3. **Envoy Gateway** v1.9.2 installed *via* Flux (OCIRepository + HelmRelease),
+   `GatewayClass eg` + `Gateway eg` Programmed at `192.168.123.11`
+   ([ADR-0004](adr/0004-gateway-api-and-ingress.md)). ✅
+4. **First workload** `podinfo` deployed declaratively in `podinfo`, exposed via
+   an `HTTPRoute` + `ReferenceGrant`, **with CPU/mem requests + limits**, and an
+   encrypted Secret decrypted in-cluster. ✅
 
-**Files it will add (planned)**
+**Files added**
 - `clusters/k8s-homelab/flux-system/` — Flux bootstrap output.
-- `apps/` (or `workloads/`) — first app manifests + kustomization.
-- `infrastructure/` — controllers (ingress/Gateway, later monitoring) as
-  `HelmRelease`s.
-- Runbook `docs/runbooks/05-gitops-flux.md` (written when Phase 3 starts).
-
-**Why Flux first:** everything after this (Cilium via Helm, monitoring,
-ingress) can then be delivered as git-managed `HelmRelease`s instead of manual
-`helm install`s — reproducible and portfolio-worthy.
+- `clusters/k8s-homelab/{kustomization,infrastructure,apps}.yaml` — app-of-apps.
+- `infrastructure/envoy-gateway/` — Gateway controller as `HelmRelease`.
+- `apps/podinfo/` — first app manifests + `secret.sops.yaml`.
+- Runbook [`docs/runbooks/05-gitops-flux.md`](runbooks/05-gitops-flux.md).
 
 ---
 
@@ -194,13 +199,12 @@ To pick this up in a new session:
    Decision 4 (observability sizing) is still open and only matters at Phase 6.
 3. Git checkpoint is **done** — repo initialized, committed, pushed to private
    GitHub, so Flux diffs will be legible.
-4. Phase 3, step 1 **done**: `flux`/`sops`/`age` are in the workspace
-   (`.devcontainer/Containerfile`), the age key exists at
-   `~/.config/sops/age/keys.txt`, and [`.sops.yaml`](../.sops.yaml) holds the
-   recipient.
-5. Next: `flux bootstrap github` (private repo, path `clusters/k8s-homelab`),
-   create the `sops-age` Secret in `flux-system`, install **Envoy Gateway** via
-   Flux, deploy the first workload with requests/limits, and write runbook 05.
+4. Phase 3 **done** (2026-10-15): Flux bootstrapped, `sops-age` wired, Envoy
+   Gateway installed via Flux, and `podinfo` deployed with an encrypted Secret.
+   See [runbook 05](runbooks/05-gitops-flux.md).
+5. Next: resolve [Decision 4](#still-open--decision-4--observability-sizing) (observability
+   sizing) and start **Phase 6** (Prometheus/Grafana via Flux); Phase 5 (IaC) is
+   an unblocked parallel option.
 
 ---
 

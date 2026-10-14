@@ -12,7 +12,7 @@ every change is verified and documented.
 |---|---|
 | [`docs/roadmap.md`](docs/roadmap.md) | phases, **open decisions**, next actions |
 | [`docs/system-inventory.md`](docs/system-inventory.md) | verified host/cluster/workspace state |
-| [`docs/runbooks/`](docs/runbooks) | do-this procedures (01 install, 02 workspace, 03 session, 04 k9s) |
+| [`docs/runbooks/`](docs/runbooks) | do-this procedures (01 install, 02 workspace, 03 session, 04 k9s, 05 GitOps/Flux) |
 | [`docs/adr/`](docs/adr) | *why* each decision was made |
 | [`docs/troubleshooting-log.md`](docs/troubleshooting-log.md) | every real failure: symptom → cause → fix → lesson |
 
@@ -59,8 +59,9 @@ State changes go in the docs (and `system-inventory.md`), not here.
 - Guest OS Ubuntu 24.04.5 · k3s `v1.37.1+k3s1` · containerd `2.3.4-k3s1`
 - CNI: **Flannel** (k3s default) · Traefik **disabled**
 - Cluster login user: `ratlab` · Workspace user: `dev` (uid 1000)
-- Ingress: **Envoy Gateway** (chosen; not installed yet) — Gateway API CRDs
-  present, no controller. See [ADR-0004](docs/adr/0004-gateway-api-and-ingress.md)
+- Ingress: **Envoy Gateway** v1.9.2 (installed via Flux; Gateway `eg`
+  `Programmed` at `192.168.123.11`). See
+  [ADR-0004](docs/adr/0004-gateway-api-and-ingress.md)
 - Host: Fedora 44 Workstation · kubeconfig at `~/.kube/config` (host)
 
 ## Conventions
