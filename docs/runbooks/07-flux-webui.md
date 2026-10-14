@@ -5,10 +5,10 @@ be managed by the **Flux Operator**, and expose its **Flux Status Web UI** at
 `flux.local` through the existing Envoy Gateway.
 
 **Scope:** documents what exists in the repo and cluster at
-`main@sha1:4271ca66` (HEAD 2026-10-15). The Web UI is anonymous (read-only by
-default); it is bound to the built-in `flux-web-admin` role so reconciles and
-other actions are available, and it is only reachable from the host via the
-Gateway.
+`main@sha1:ab1ef60` (2026-10-15). The Web UI is **anonymous** — the identity is
+bound to the built-in `flux-web-admin` role, so it has **view *and* actions**
+(reconcile/suspend/resume/restart); it is reachable **only from the host via the
+Gateway**, so anonymous admin is acceptable here (SSO is the upgrade path).
 
 > **Why the operator?** There is no first-party Flux UI (`fluxcd/webui` is
 > archived), and **Weave GitOps** is unmaintained and cannot read HelmRelease
@@ -103,7 +103,9 @@ devpod ssh k8s-homelab-kvm --command 'flux trace kustomization flux-system'
 # Expect: "object not managed by Flux"  ← the operator owns it now
 devpod ssh k8s-homelab-kvm --command 'flux get kustomizations -A'    # all Ready
 devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get deploy'
-# helm/kustomize/notification/source controllers unchanged (no restarts) + flux-operator
+# helm/kustomize/notification/source controllers + flux-operator, all healthy.
+# NB: the operator performs a normal ROLLING UPDATE of the controller Deployments
+# to its own manifests shortly after adoption (new pods, RESTARTS 0) — expected.
 devpod ssh k8s-homelab-kvm --command 'kubectl get crd | grep -c fluxcd'   # CRDs intact
 ```
 

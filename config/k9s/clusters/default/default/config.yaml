@@ -5,11 +5,14 @@ k9s:
     active: all
     lockFavorites: false
     favorites:
+      - podinfo
+      - kube-public
+      - default
       - all
       - kube-system
       - monitoring
   view:
-    active: v1/pods all
+    active: v1/namespaces
   featureGates:
     nodeShell: false
   proxy: null

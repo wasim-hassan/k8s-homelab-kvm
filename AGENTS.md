@@ -12,7 +12,7 @@ every change is verified and documented.
 |---|---|
 | [`docs/roadmap.md`](docs/roadmap.md) | phases, **open decisions**, next actions |
 | [`docs/system-inventory.md`](docs/system-inventory.md) | verified host/cluster/workspace state |
-| [`docs/runbooks/`](docs/runbooks) | do-this procedures (01 install, 02 workspace, 03 session, 04 k9s, 05 GitOps/Flux, 06 observability) |
+| [`docs/runbooks/`](docs/runbooks) | do-this procedures (01 install, 02 workspace, 03 session, 04 k9s, 05 GitOps/Flux, 06 observability, 07 Flux Web UI) |
 | [`docs/adr/`](docs/adr) | *why* each decision was made |
 | [`docs/troubleshooting-log.md`](docs/troubleshooting-log.md) | every real failure: symptom → cause → fix → lesson |
 
@@ -62,6 +62,10 @@ State changes go in the docs (and `system-inventory.md`), not here.
 - Ingress: **Envoy Gateway** v1.9.2 (installed via Flux; Gateway `eg`
   `Programmed` at `192.168.123.11`). See
   [ADR-0004](docs/adr/0004-gateway-api-and-ingress.md)
+- GitOps: **Flux CD** v2.9.6, **managed by the Flux Operator** (chart `0.61.0`)
+  via a `FluxInstance` since 2026-10-15; **Flux Status Web UI** at `flux.local`.
+  See [ADR-0006](docs/adr/0006-flux-operator-managed.md) and
+  [runbook 07](docs/runbooks/07-flux-webui.md)
 - Host: Fedora 44 Workstation · kubeconfig at `~/.kube/config` (host)
 
 ## Conventions

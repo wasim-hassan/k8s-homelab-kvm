@@ -22,8 +22,8 @@ k9s opens **scoped to one namespace**, which defaults to `default`. All of the
 cluster's pods live in `kube-system`, so the `default` pod view is legitimately
 empty. This is a **configuration** issue, not a broken tool.
 
-The config in this repo fixes it: k9s now **opens on all pods in all
-namespaces** and jumps anywhere with one keystroke.
+The config in this repo fixes it: k9s now **opens on the Namespaces view (all
+namespaces)** and jumps anywhere with one keystroke.
 
 ---
 
@@ -43,7 +43,7 @@ project.
 | `config/k9s/config.yaml` | skin, refresh rate, CPU/MEM thresholds (warn 80/crit 90), log view |
 | `config/k9s/hotkeys.yaml` | one-key jumps (Shift-0..5, Shift-X, Shift-H) |
 | `config/k9s/skins/gruvbox-dark-hard.yaml` | gruvbox skin (vendored, Apache-2.0) |
-| `config/k9s/clusters/default/default/config.yaml` | start on **all** namespaces, view `pods` |
+| `config/k9s/clusters/default/default/config.yaml` | start on **all** namespaces, view `namespaces` |
 
 The `clusters/<context>/<cluster>/` path is `<context>` = `default` and
 `<cluster>` = `default` — both confirmed from `~/.kube/config`.
@@ -55,8 +55,10 @@ The `clusters/<context>/<cluster>/` path is `<context>` = `default` and
 
 > Because the mount **replaces** the whole config dir, changes to any file above
 > are picked up on the next k9s launch — no rebuild needed. Kubernetes
-> namespaces are flat (no hierarchy); favorites trimmed to `all`, `kube-system`,
-> `monitoring` to keep the UI minimal.
+> namespaces are flat (no hierarchy); favorites pinned to `podinfo`,
+> `kube-public`, `default`, `all`, `kube-system`, `monitoring`. (`config.yaml` is
+> k9s's per-context **runtime state** — k9s rewrites it on exit, so re-commit it if
+> favorites/view change.)
 
 ---
 
@@ -70,8 +72,9 @@ devpod ssh k8s-homelab-kvm
 k9s
 ```
 
-It lands on **Pods, all namespaces, live**. (`k9s -A` forces all-namespaces too,
-but the config already makes that the default.)
+It lands on the **Namespaces** view, all namespaces, live. (Press `Shift-1` for
+Pods; `k9s -A` forces all-namespaces too, but the config already makes that the
+default.)
 
 ---
 
@@ -79,7 +82,7 @@ but the config already makes that the default.)
 
 | Press / type | You see |
 |---|---|
-| *(launch)* | all pods, all namespaces, with CPU/MEM/restarts/age |
+| *(launch)* | **Namespaces** view (all namespaces) |
 | `Shift-0` | **Nodes** — `k8s-cp-01`, `k8s-worker-01` (your VMs), usage + pod counts |
 | `Shift-1` | Pods (all namespaces) |
 | `Shift-2` | Deployments |
@@ -133,7 +136,7 @@ but the config already makes that the default.)
 
 - [ ] `devpod ssh k8s-homelab-kvm --command 'echo $K9S_CONFIG_DIR'` → `/home/dev/.config/k9s`
 - [ ] `k9s version --short` → `v0.51.0`
-- [ ] Launch `k9s` → opens on **all pods, all namespaces** (not empty)
+- [ ] Launch `k9s` → opens on the **Namespaces** view (all namespaces), not empty
 - [ ] Theme is gruvbox (dark background `#1d2021`)
 - [ ] `Shift-0` shows both nodes `Ready`
 - [ ] `Shift-H` renders the pulses/health view

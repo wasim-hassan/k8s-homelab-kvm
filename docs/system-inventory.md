@@ -414,7 +414,7 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 
 ## GitOps state (Phase 3 — Flux CD, now operator-managed)
 
-Verified 2026-10-15, reconciled at `main@sha1:4271ca66`.
+Verified 2026-10-15, reconciled at `main@sha1:ab1ef60`.
 
 | Item | Value |
 |---|---|
