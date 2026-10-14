@@ -107,6 +107,30 @@ devpod ssh k8s-homelab-kvm --command \
 # Expect: 200
 ```
 
+### Dashboards actually load (proves the OOM fix)
+```bash
+# Grafana can list its dashboards (expect 24) …
+devpod ssh k8s-homelab-kvm --command \
+  'curl -s -u admin:<pw> -H "Host: grafana.local" \
+     "http://192.168.123.11/api/search?type=dash-db" \
+   | python3 -c "import sys,json;print(len(json.load(sys.stdin)),\"dashboards\")"'
+# … and can query Prometheus through its datasource proxy (expect a result)
+devpod ssh k8s-homelab-kvm --command \
+  'curl -s -u admin:<pw> -H "Host: grafana.local" \
+     "http://192.168.123.11/api/datasources/proxy/uid/prometheus/api/v1/query?query=count(up)"'
+```
+
+### No OOMKill / headroom
+```bash
+devpod ssh k8s-homelab-kvm --command \
+  'kubectl -n monitoring top pod -l app.kubernetes.io/name=grafana --containers'
+# grafana ~317Mi (< 512Mi limit); restartCount 0
+devpod ssh k8s-homelab-kvm --command \
+  'kubectl -n monitoring get pod -l app.kubernetes.io/name=grafana \
+     -o jsonpath="{.items[0].status.containerStatuses[0].restartCount}"'
+# Expect: 0
+```
+
 ### Node memory after deploy
 ```bash
 devpod ssh k8s-homelab-kvm --command 'kubectl top nodes'
@@ -134,6 +158,10 @@ from the SOPS secret:
 devpod ssh k8s-homelab-kvm --command \
   "kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d"
 ```
+
+> **Note:** any Grafana rollout (a HelmRelease change or a pod restart)
+> invalidates existing browser sessions, so you will be asked to log in again.
+> The stored credentials are unchanged — re-run the command above.
 
 **Prometheus** — not exposed through the Gateway (ClusterIP only). Reach the UI
 with a port-forward tunnel from your workstation:

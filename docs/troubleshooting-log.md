@@ -856,6 +856,11 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   in memory). `kubectl top pod` without `--containers` reports the **pod total**,
   which can hide which container is actually at its ceiling — always add
   `--containers` when chasing OOMKills.
+- **Confirmed fixed (2026-10-15):** after the HelmRelease reconciled, the
+  Dashboards page renders data for all dashboards; Grafana `restartCount` stayed
+  `0` and memory settled at **~317Mi/512Mi**. Note that a Grafana rollout
+  invalidates existing browser sessions, so you are prompted to log in again —
+  the stored credentials are unchanged.
 
 ## 2026-10-15 — etcd / scheduler / controller-manager dashboards show "No data"
 
