@@ -30,7 +30,7 @@ block each phase. This is also the **resume point** for a new session: read the
 | 2 | Operator workspace (Devpod/Podman) + observability (k9s) | ✅ done | — |
 | **3** | **GitOps foundation (Flux + SOPS/age, ingress, first workload)** | ✅ done | — |
 | 4 | CNI migration → Cilium (+ Hubble) | 💤 skip for now | Decision 1 → **skip Cilium** |
-| 5 | IaC as code (Terraform libvirt + Ansible) | ⏳ | — |
+| 5 | IaC — kept as scripts; **Ansible dropped, Terraform deferred** ([ADR-0005](adr/0005-no-ansible-node-config.md)) | ➖ re-scoped | — |
 | 6 | Observability stack (Prometheus/Grafana/Alertmanager) | ⏳ | Decision 4 (sizing) |
 | 7 | Security hardening (RBAC, NetworkPolicy, PSS) | ⏳ | Phase 4 for NetworkPolicy |
 | 8 | CI/CD + image automation | ⏳ | — (Phase 3 done) |
@@ -42,7 +42,7 @@ block each phase. This is also the **resume point** for a new session: read the
 
 > **Resolved 2026-10-14:** Cilium is **skipped for now** (keep Flannel) to stay
 > lightweight; the note below is kept for when/if that changes. See
-> [Resolved decisions](#resolved-decisions-2026-10-14).
+> [Resolved decisions](#resolved-decisions).
 
 Phase 4 (Cilium) is effectively a **fresh-install-only** change: it requires k3s
 started with `--flannel-backend=none` (and `--disable-network-policy`), which
@@ -108,21 +108,28 @@ by doing it on an empty (or Flux-only) cluster.
 
 ---
 
-## Phase 5 — Infrastructure as Code
+## Phase 5 — Infrastructure as Code *(re-scoped 2026-10-15)*
 
-**Goal:** stop hand-building VMs/network; make them code.
+> **Status: re-scoped — Ansible dropped, Terraform deferred.** See
+> [ADR-0005](adr/0005-no-ansible-node-config.md). The IaC intent is met by the
+> existing `scripts/` + GitOps; **no configuration-management tool is added.**
 
-- **Terraform** (`dmacvicar/libvirt`) to provision the `k8s` network + VMs.
-  *Researched version:* provider **v0.9.9**. Today `terraform/` holds only
-  [`libvirt-k8s-net.xml`](../terraform/libvirt-k8s-net.xml).
-- **Ansible** to replace `10-prepare-nodes.sh` (kernel modules, sysctl, k3s
-  prereqs). Today `ansible/` is empty.
-- Wire Terraform state/inventory into the Ansible inventory
-  (`inventory/nodes.yml` is the current source of truth).
+**Goal:** make the host/cluster build reproducible as code — without adding a
+tool that has no job at this scale.
 
-**Note:** the VMs are currently created by the external tool
-`~/Sync/Repos/kvm-vm-provisioner` — this project **does not modify that repo**.
-Phase 5 Terraform is an *alternative* code path, not a change to that tool.
+- **Node baseline** → kept as [`scripts/10-prepare-nodes.sh`](../scripts/10-prepare-nodes.sh)
+  (idempotent, verified). *Not* converted to Ansible.
+- **Terraform (libvirt)** → **deferred**: the VMs are created by the external
+  `~/Sync/Repos/kvm-vm-provisioner`, which this project must not modify, so a
+  rewrite is a redundant "alternative path" rather than a gain. `terraform/`
+  keeps only [`libvirt-k8s-net.xml`](../terraform/libvirt-k8s-net.xml) as
+  reference.
+- **Long-term replacement** → **Talos** (immutable OS) removes the node-config
+  layer entirely. Tracked as a stretch goal.
+
+**Why:** Kubernetes/Helm/Flux operate *inside* the cluster and cannot configure
+the host OS, so this layer is real — but at 2 nodes a bash script covers it more
+simply than Ansible. Full reasoning in [ADR-0005](adr/0005-no-ansible-node-config.md).
 
 ---
 
@@ -168,7 +175,7 @@ Phase 5 Terraform is an *alternative* code path, not a change to that tool.
 
 ---
 
-## Resolved decisions (2026-10-14)
+## Resolved decisions
 
 Recorded here (in committed docs, not only the private `AGENTS.local.md`) so the
 repo's memory is complete.
@@ -178,6 +185,7 @@ repo's memory is complete.
 | 1 | Cilium timing | **Skip Cilium for now** — keep Flannel (lightweight priority). Revisit as a stretch. |
 | 2 | Git remote for Flux | **Private GitHub** — `wasim-hassan/k8s-homelab-kvm` (git init + push done). |
 | 3 | Ingress / Gateway controller | **Envoy Gateway** (CNCF, Apache-2.0, Gateway API) — [ADR-0004](adr/0004-gateway-api-and-ingress.md) now **Accepted**. |
+| 5 | Config management (Ansible?) | **No Ansible** — keep `10-prepare-nodes.sh`; Terraform-libvirt deferred (redundant with the external provisioner); Talos is the long-term replacement. [ADR-0005](adr/0005-no-ansible-node-config.md). |
 
 The option tables for decisions 1–3 are preserved in git history; the
 resolutions above supersede them.
@@ -195,16 +203,18 @@ To pick this up in a new session:
 
 1. Start the environment — [runbook 03](runbooks/03-session-lifecycle.md)
    (`kvm on` → `vm start k8s-cp-01` → `vm start k8s-worker-01` → `devpod up . --ide none`).
-2. Decisions 1–3 are **resolved** ([above](#resolved-decisions-2026-10-14));
-   Decision 4 (observability sizing) is still open and only matters at Phase 6.
+2. Decisions **1–3 and 5** are resolved ([above](#resolved-decisions));
+   Decision 4 (observability sizing) is resolved during Phase 6.
 3. Git checkpoint is **done** — repo initialized, committed, pushed to private
    GitHub, so Flux diffs will be legible.
 4. Phase 3 **done** (2026-10-15): Flux bootstrapped, `sops-age` wired, Envoy
    Gateway installed via Flux, and `podinfo` deployed with an encrypted Secret.
    See [runbook 05](runbooks/05-gitops-flux.md).
-5. Next: resolve [Decision 4](#still-open--decision-4--observability-sizing) (observability
-   sizing) and start **Phase 6** (Prometheus/Grafana via Flux); Phase 5 (IaC) is
-   an unblocked parallel option.
+5. Phase 5 **re-scoped** (2026-10-15): Ansible dropped, Terraform deferred —
+   [ADR-0005](adr/0005-no-ansible-node-config.md).
+6. Phase 6 — Observability via Flux (kube-prometheus-stack); sizing per
+   [Decision 4](#still-open--decision-4--observability-sizing). See
+   [runbook 06](runbooks/06-observability.md).
 
 ---
 

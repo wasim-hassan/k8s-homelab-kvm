@@ -27,6 +27,7 @@ decisions.
 | 0002 | [Implicit CPU model via `--osinfo`](adr/0002-implicit-cpu-model.md) |
 | 0003 | [Operator environment in a Devpod workspace](adr/0003-devpod-workspace.md) |
 | 0004 | [Ingress / Gateway API strategy](adr/0004-gateway-api-and-ingress.md) *(accepted — Envoy Gateway)* |
+| 0005 | [No Ansible — node config stays scripted](adr/0005-no-ansible-node-config.md) *(accepted)* |
 
 ## Reference
 

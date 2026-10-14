@@ -340,8 +340,9 @@ virsh start k8s-worker-01
 
 Recorded so the runbooks don't assume availability.
 
-On the **host**: `tuned` (intentional), `k3d`, `ansible`, `flux`, `pipx`,
-`genisoimage`.
+On the **host**: `tuned` (intentional), `k3d`, `flux`, `pipx`, `genisoimage`.
+**`ansible` is intentionally *not* adopted** (2026-10-15) — keep
+`scripts/10-prepare-nodes.sh`; see [ADR-0005](adr/0005-no-ansible-node-config.md).
 
 In the **workspace**: `kubeseal`, `kustomize` — still confirmed absent on
 **2026-10-14**. `kubectl -k` covers Kustomize, so a standalone `kustomize` binary

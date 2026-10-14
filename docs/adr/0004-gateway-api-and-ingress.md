@@ -41,7 +41,7 @@ reason.
 (https://gateway-api.sigs.k8s.io/) as the north-south abstraction (the CRDs are
 already present) and install **Envoy Gateway** as the controller, delivered
 *via* Flux (HelmRelease). Tracked as
-[Decision 3](../roadmap.md#resolved-decisions-2026-10-14).
+[Decision 3](../roadmap.md#resolved-decisions).
 
 Rationale: CNCF-hosted and Apache-2.0 (strong FOSS story), full Gateway API
 support, and it keeps the ingress choice **independent** of the CNI choice (no
@@ -108,4 +108,4 @@ Gateway), applied by the `infrastructure` Kustomization
   Version recorded in [system-inventory.md](../system-inventory.md).
 - Cilium ever gets scheduled — then reconsider whether Cilium should be the
   Gateway API controller, collapsing two decisions into one (currently skipped —
-  see the [roadmap](../roadmap.md#resolved-decisions-2026-10-14)).
+  see the [roadmap](../roadmap.md#resolved-decisions)).
