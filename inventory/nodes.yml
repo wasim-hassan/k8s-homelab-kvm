@@ -1,4 +1,8 @@
-# Ansible inventory — k8s-homelab-kvm
+# Node inventory — k8s-homelab-kvm
+#
+# Source of truth for node facts, parsed by scripts/lib.sh (`inv_all`/`inv_role`).
+# The shape is Ansible-compatible YAML for familiarity, but Ansible is not used
+# (see ADR-0005).
 #
 # Addresses are static DHCP reservations pinned by MAC in
 # terraform/libvirt-k8s-net.xml, so these are stable across VM restarts.
@@ -16,7 +20,7 @@ all:
           mac_address: "52:54:00:17:ef:cf"
           node_role: control-plane
           vcpu: 2
-          memory_mib: 2048
+          memory_mib: 3072
           disk_gb: 30
 
     k8s_workers:
@@ -28,7 +32,7 @@ all:
           mac_address: "52:54:00:96:63:19"
           node_role: worker
           vcpu: 2
-          memory_mib: 1024
+          memory_mib: 1536
           disk_gb: 30
 
   vars:

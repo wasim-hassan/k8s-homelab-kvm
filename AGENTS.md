@@ -54,7 +54,7 @@ State changes go in the docs (and `system-inventory.md`), not here.
 |---|---|---|
 | Role | control plane | worker |
 | IP | 192.168.123.11 | 192.168.123.12 |
-| RAM | 2 GiB | 1 GiB |
+| RAM | 3 GiB | 1536 MiB |
 
 - Guest OS Ubuntu 24.04.5 · k3s `v1.37.1+k3s1` · containerd `2.3.4-k3s1`
 - CNI: **Flannel** (k3s default) · Traefik **disabled**

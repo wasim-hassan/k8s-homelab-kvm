@@ -96,8 +96,8 @@ encrypted key would force `ssh-agent` plumbing into every later script.
 | Guest OS | Ubuntu 24.04.5 LTS | Ubuntu 24.04.5 LTS |
 | Kernel | 6.8.0-146-generic | 6.8.0-146-generic |
 | vCPU | 2 | 2 |
-| RAM total | 1967 MiB | 961 MiB |
-| RAM available (idle) | ~1400 MiB | ~500 MiB |
+| RAM total | 2907 MiB (3 GiB) | 1463 MiB (1536 MiB) |
+| RAM available (idle) | ~1600 MiB | ~880 MiB |
 | Disk | 29 GiB usable, 26 GiB free | 29 GiB usable, 27 GiB free |
 | MAC | `52:54:00:17:ef:cf` | `52:54:00:96:63:19` |
 | IP | 192.168.123.11 | 192.168.123.12 |
@@ -309,30 +309,34 @@ Verified bidirectional: `k8s-cp-01` → `k8s-worker-01` and back both ping.
 | Consumer | RAM |
 |---|---|
 | Host OS + desktop + TLP + libvirt daemons | ~4–5 GiB |
-| `k8s-cp-01` | 2 GiB |
-| `k8s-worker-01` | 1 GiB |
-| **Total** | **~7–8 GiB of 15 GiB** |
+| `k8s-cp-01` | 3 GiB |
+| `k8s-worker-01` | 1536 MiB |
+| **Total** | **~9–10 GiB of 15 GiB** |
+
+> **Bumped 2026-10-15 (Decision 4)** ahead of the Phase 6 monitoring stack:
+> `k8s-cp-01` 2 GiB → 3 GiB, `k8s-worker-01` 1 GiB → 1536 MiB. Done on
+> shut-off domains (`setmaxmem` then `setmem`, `--config`); `memory_mib` in
+> [`inventory/nodes.yml`](../inventory/nodes.yml) updated to match.
 
 **Watch items:**
-- `k8s-worker-01` has only **~500 MiB available** idle. k3s agent plus a few
-  pods fits, but there is little headroom before hosting real workloads. Bump to
-  1536 MiB when it starts running apps (and update `memory_mib` in the inventory).
-- `k8s-cp-01` has ~1400 MiB available with the control plane up. Comfortable
-  through FluxCD, but Prometheus + Grafana in a later phase is when a 2 GiB
-  control plane starts getting OOM-killed.
+- `k8s-worker-01` now has **~880 MiB available** idle — headroom for
+  node-exporter and scheduling.
+- `k8s-cp-01` now has **~1600 MiB available** with the control plane up, which
+  is what makes room for the trimmed Prometheus/Grafana stack.
 
-Bump commands if needed (raise the max **before** the current size; do it on a
-shut-off domain so it persists cleanly):
+Bump commands if a future phase needs more (raise the max **before** the current
+size; do it on a shut-off domain so it persists cleanly):
 
 ```bash
-virsh shutdown k8s-worker-01
-virsh setmaxmem k8s-worker-01 1536M --config
-virsh setmem    k8s-worker-01 1536M --config
-virsh start k8s-worker-01
+# Example: raise k8s-cp-01 from 3 GiB to 4 GiB (adjust size per node).
+virsh shutdown k8s-cp-01
+virsh setmaxmem k8s-cp-01 4096M --config
+virsh setmem    k8s-cp-01 4096M --config
+virsh start k8s-cp-01
 ```
 
-(Same pattern for `k8s-cp-01` with `3072M`. Update `memory_mib` in
-`inventory/nodes.yml` to match.)
+(Set `setmaxmem` before `setmem`. Update `memory_mib` in `inventory/nodes.yml`
+to match.)
 
 ---
 
