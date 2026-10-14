@@ -1,0 +1,27 @@
+apiVersion: fluxcd.controlplane.io/v1
+kind: FluxInstance
+metadata:
+  name: flux
+  namespace: flux-system
+spec:
+  distribution:
+    version: "2.9.x"
+    registry: "ghcr.io/fluxcd"
+  components:
+    - source-controller
+    - kustomize-controller
+    - helm-controller
+    - notification-controller
+  cluster:
+    type: kubernetes
+    multitenant: false
+    networkPolicy: false
+    domain: "cluster.local"
+  # Mirrors the original `flux bootstrap` configuration so the operator can
+  # adopt the existing GitRepository and Kustomization with zero downtime.
+  sync:
+    kind: GitRepository
+    url: "ssh://git@github.com/wasim-hassan/k8s-homelab-kvm"
+    ref: "refs/heads/main"
+    path: "clusters/k8s-homelab"
+    pullSecret: "flux-system"

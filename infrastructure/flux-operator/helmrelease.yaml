@@ -1,0 +1,48 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: flux-operator
+  namespace: flux-system
+spec:
+  interval: 30m
+  releaseName: flux-operator
+  chartRef:
+    kind: OCIRepository
+    name: flux-operator
+  install:
+    crds: Create
+  upgrade:
+    crds: CreateReplace
+    cleanupOnFail: true
+    strategy:
+      name: RetryOnFailure
+      retryInterval: 5m
+  # Trimmed for a small 2-node cluster (3 GiB + 1536 MiB).
+  values:
+    # Flux Status Web UI (https://fluxoperator.dev/web-ui/).
+    web:
+      enabled: true
+      # Expose via the existing Envoy Gateway (Gateway eg in envoy-gateway-system).
+      httpRoute:
+        enabled: true
+        parentRefs:
+          - name: eg
+            namespace: envoy-gateway-system
+        hostnames:
+          - flux.local
+      # Anonymous identity bound to the flux-admin group (see rbac.yaml).
+      # The UI is only reachable from the host via the Gateway, so no SSO is used.
+      config:
+        authentication:
+          type: Anonymous
+          anonymous:
+            username: admin
+            groups:
+              - flux-admin
+    resources:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
