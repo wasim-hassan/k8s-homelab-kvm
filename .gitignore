@@ -16,3 +16,6 @@ keys.txt
 
 # local libvirt network backups
 *.backup.xml
+
+# private agent context (loaded via opencode.json, never committed)
+AGENTS.local.md
