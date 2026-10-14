@@ -949,10 +949,11 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
 - **Root cause / resolution:** Once the operator adopts Flux, it annotates
   **every** object it manages with `kustomize.toolkit.fluxcd.io/prune: Disabled`
   (and `ssa: Ignore`). kustomize-controller **skips pruning** any object carrying
-  that annotation, so deleting the bootstrap dir is safe — the CRDs and
-  controllers survive. Confirmed: after removal + reconcile the controllers kept
-  their original `AGE` (no restarts) and `kubectl get crd | grep -c fluxcd`
-  stayed 15.
+  that annotation, so deleting the bootstrap dir is safe — the CRDs and Flux
+  custom resources survive. Confirmed: after removal + reconcile
+  `kubectl get crd | grep -c fluxcd` stayed 15 and no Flux CR was deleted. (The
+  operator then performs a normal **rolling update** of the controller Deployments
+  to its own manifests shortly after adoption — expected, no outage.)
 - **Lesson:** Flux prune honours `kustomize.toolkit.fluxcd.io/prune: Disabled`.
   Before deleting objects out of a pruned Kustomization, check the inventory
   **and** the objects' annotations — a manager that marks its objects
