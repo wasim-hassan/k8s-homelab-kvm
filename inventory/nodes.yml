@@ -1,0 +1,36 @@
+# Ansible inventory — k8s-homelab-kvm
+#
+# Addresses are static DHCP reservations pinned by MAC in
+# terraform/libvirt-k8s-net.xml, so these are stable across VM restarts.
+# Do not replace them with the dynamic-pool addresses you may see in `vm`.
+
+all:
+  children:
+    k8s_control_plane:
+      hosts:
+        k8s-cp-01:
+          ansible_host: 192.168.123.11
+          ansible_user: ratlab
+          # ip_default_route / bridge info kept for operator reference
+          libvirt_domain: k8s-cp-01
+          mac_address: "52:54:00:17:ef:cf"
+          node_role: control-plane
+          vcpu: 2
+          memory_mib: 2048
+          disk_gb: 30
+
+    k8s_workers:
+      hosts:
+        k8s-worker-01:
+          ansible_host: 192.168.123.12
+          ansible_user: ratlab
+          libvirt_domain: k8s-worker-01
+          mac_address: "52:54:00:96:63:19"
+          node_role: worker
+          vcpu: 2
+          memory_mib: 1024
+          disk_gb: 30
+
+  vars:
+    ansible_ssh_private_key_file: ~/.ssh/k8s-homelab-kvm
+    ansible_python_interpreter: /usr/bin/python3

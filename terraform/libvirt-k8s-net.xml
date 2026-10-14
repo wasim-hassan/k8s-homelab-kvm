@@ -1,0 +1,13 @@
+<network>
+  <name>k8s</name>
+  <uuid>a547ca9d-acb1-486a-9ae3-e5cf44d2b88b</uuid>
+  <forward mode='nat'/>
+  <bridge name='virbr1' stp='on' delay='0'/>
+  <ip address='192.168.123.1' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='192.168.123.128' end='192.168.123.254'/>
+      <host mac='52:54:00:17:ef:cf' name='k8s-cp-01' ip='192.168.123.11'/>
+      <host mac='52:54:00:96:63:19' name='k8s-worker-01' ip='192.168.123.12'/>
+    </dhcp>
+  </ip>
+</network>

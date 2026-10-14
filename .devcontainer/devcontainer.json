@@ -1,0 +1,39 @@
+{
+  "name": "k8s-homelab-kvm",
+  "build": {
+    "context": "..",
+    "dockerfile": "Containerfile"
+  },
+
+  "containerUser": "dev",
+  "remoteUser": "dev",
+
+  "runArgs": [
+    "--network=host",
+    "--userns=keep-id",
+    "--security-opt=label=disable",
+    "--add-host=k8s-cp-01:192.168.123.11",
+    "--add-host=k8s-worker-01:192.168.123.12"
+  ],
+
+  "mounts": [
+    "source=${localEnv:HOME}/.kube,target=/home/dev/.kube,type=bind",
+    "source=${localEnv:HOME}/.ssh/k8s-homelab-kvm,target=/home/dev/.ssh/k8s-homelab-kvm,type=bind,readonly",
+    "source=${localEnv:HOME}/.cache/k3s-homelab,target=/home/dev/.cache/k3s-homelab,type=bind,readonly",
+    "source=${localEnv:HOME}/.config/nvim,target=/home/dev/.config/nvim,type=bind",
+    "source=${localWorkspaceFolder}/config/k9s,target=/home/dev/.config/k9s,type=bind"
+  ],
+
+  "containerEnv": {
+    "KUBECONFIG": "/home/dev/.kube/config",
+    "K9S_CONFIG_DIR": "/home/dev/.config/k9s"
+  },
+  "remoteEnv": {
+    "KUBECONFIG": "/home/dev/.kube/config",
+    "K9S_CONFIG_DIR": "/home/dev/.config/k9s"
+  },
+
+  "postCreateCommand": "kubectl version --client && helm version --short && terraform version | head -1 && k9s version --short && yq --version && nvim --version | head -1",
+
+  "customizations": {}
+}

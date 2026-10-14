@@ -1,0 +1,22 @@
+k9s:
+  refreshRate: 2
+  liveViewAutoRefresh: true
+  skipLatestRevCheck: true
+  ui:
+    skin: gruvbox-dark-hard
+    splashless: true
+    noIcons: false
+    enableMouse: false
+  thresholds:
+    cpu:
+      warn: 60
+      critical: 85
+    memory:
+      warn: 60
+      critical: 85
+  logger:
+    tail: 200
+    buffer: 1000
+    sinceSeconds: -1
+    showTime: false
+    textWrap: false

@@ -1,0 +1,16 @@
+k9s:
+  cluster: default
+  readOnly: false
+  namespace:
+    active: all
+    lockFavorites: false
+    favorites:
+      - all
+      - kube-system
+      - default
+      - kube-public
+  view:
+    active: v1/pods all
+  featureGates:
+    nodeShell: false
+  proxy: null

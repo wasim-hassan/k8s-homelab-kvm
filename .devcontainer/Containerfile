@@ -1,0 +1,118 @@
+# .devcontainer/Containerfile — Devpod workspace for k8s-homelab-kvm
+#
+# Podman-native build file. The devcontainer spec's "dockerfile" key points
+# here. Base is Fedora on Red Hat's FOSS Quay registry — vendor-neutral, no
+# Microsoft base image and no `vscode` user. Everything inside is FOSS.
+#
+# Podman builds OCI-format images, where the SHELL directive is ignored and
+# RUN executes under /bin/sh. Every step below avoids bashisms/`pipefail`.
+
+FROM quay.io/fedora/fedora:44
+
+ARG KUBECTL_VERSION=v1.37.1
+ARG HELM_VERSION=v4.3.0
+ARG TERRAFORM_VERSION=1.16.4
+ARG K9S_VERSION=v0.51.0
+ARG YQ_VERSION=v4.54.1
+ARG NVIM_VERSION=v0.12.6
+
+# ── Base packages + non-root user ─────────────────────────────────────────
+# The project scripts need bash, python3 + PyYAML (inventory parsing),
+# openssh-clients (ssh/scp to nodes), curl, coreutils. kitty-terminfo lets the
+# TUI tools (k9s) run under the kitty terminal (TERM=xterm-kitty).
+#
+# The workspace runs as `dev` (uid/gid 1000). uid 1000 is required so that
+# Podman's `--userns=keep-id` maps it to the host user (wasim, uid 1000) and
+# the bind-mounted credentials are readable.
+RUN dnf install -y --setopt=install_weak_deps=False \
+      ca-certificates curl wget git make jq unzip xz less procps-ng tar gzip \
+      openssh-clients python3 python3-pyyaml bash-completion iproute bind-utils \
+      nmap-ncat shadow-utils sudo which hostname findutils kitty-terminfo \
+ && dnf clean all \
+ && groupadd --gid 1000 dev \
+ && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash dev \
+ && printf '%s\n' 'dev ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/dev \
+ && chmod 0440 /etc/sudoers.d/dev
+
+# ── kubectl (checksum verified) ────────────────────────────────────────────
+# dl.k8s.io publishes a bare hash with *no* filename, so `sha256sum -c` cannot
+# consume it directly — we build the "hash  file" line ourselves.
+RUN curl -fsSL --retry 3 --retry-delay 2 -o /usr/local/bin/kubectl \
+      "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+ && curl -fsSL --retry 3 --retry-delay 2 -o /tmp/kubectl.sha256 \
+      "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256" \
+ && echo "$(cat /tmp/kubectl.sha256)  /usr/local/bin/kubectl" | sha256sum -c - \
+ && chmod 0755 /usr/local/bin/kubectl \
+ && command rm -f /tmp/kubectl.sha256
+
+# ── helm (checksum verified) ───────────────────────────────────────────────
+RUN curl -fsSL --retry 3 --retry-delay 2 -o /tmp/helm.tar.gz \
+      "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
+ && curl -fsSL --retry 3 --retry-delay 2 -o /tmp/helm.sha256sum \
+      "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz.sha256sum" \
+ && expected="$(awk '{print $1}' /tmp/helm.sha256sum)" \
+ && actual="$(sha256sum /tmp/helm.tar.gz | awk '{print $1}')" \
+ && echo "helm checksum expected=${expected} actual=${actual}" \
+ && [ -n "$expected" ] && [ "$expected" = "$actual" ] \
+ && tar -xzf /tmp/helm.tar.gz -C /tmp \
+ && install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm \
+ && command rm -rf /tmp/helm.tar.gz /tmp/helm.sha256sum /tmp/linux-amd64
+
+# ── terraform (checksum verified against HashiCorp's SHA256SUMS) ───────────
+RUN curl -fsSL --retry 3 --retry-delay 2 -o /tmp/terraform.zip \
+      "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" \
+ && curl -fsSL --retry 3 --retry-delay 2 -o /tmp/terraform_SHA256SUMS \
+      "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_SHA256SUMS" \
+ && expected="$(grep -E " terraform_${TERRAFORM_VERSION}_linux_amd64\.zip$" /tmp/terraform_SHA256SUMS | awk '{print $1}')" \
+ && actual="$(sha256sum /tmp/terraform.zip | awk '{print $1}')" \
+ && [ -n "$expected" ] && [ "$expected" = "$actual" ] \
+ && unzip -o -q /tmp/terraform.zip -d /usr/local/bin/ \
+ && chmod 0755 /usr/local/bin/terraform \
+ && command rm -f /tmp/terraform.zip /tmp/terraform_SHA256SUMS
+
+# ── k9s (checksum verified; Fedora is rpm-based) ───────────────────────────
+RUN curl -fsSL --retry 3 --retry-delay 2 -o /tmp/k9s.rpm \
+      "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_linux_amd64.rpm" \
+ && curl -fsSL --retry 3 --retry-delay 2 -o /tmp/k9s_checksums.sha256 \
+      "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/checksums.sha256" \
+ && expected="$(grep -E " k9s_linux_amd64\.rpm$" /tmp/k9s_checksums.sha256 | awk '{print $1}')" \
+ && actual="$(sha256sum /tmp/k9s.rpm | awk '{print $1}')" \
+ && [ -n "$expected" ] && [ "$expected" = "$actual" ] \
+ && dnf install -y /tmp/k9s.rpm \
+ && dnf clean all \
+ && command rm -f /tmp/k9s.rpm /tmp/k9s_checksums.sha256
+
+# ── yq ─────────────────────────────────────────────────────────────────────
+# Upstream's `checksums` file is NOT sha256sum-compatible, so this is installed
+# unverified (recorded in the runbook).
+RUN curl -fsSL --retry 3 --retry-delay 2 -o /usr/local/bin/yq \
+      "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" \
+ && chmod 0755 /usr/local/bin/yq
+
+# ── neovim ─────────────────────────────────────────────────────────────────
+# Neovim publishes no plain checksum for the release tarball, so this is
+# installed unverified (recorded in the runbook). The host LazyVim config is
+# bind-mounted at /home/dev/.config/nvim.
+RUN curl -fsSL --retry 3 --retry-delay 2 -o /tmp/nvim.tar.gz \
+      "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-x86_64.tar.gz" \
+ && tar -xzf /tmp/nvim.tar.gz -C /opt \
+ && ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim \
+ && command rm -f /tmp/nvim.tar.gz
+
+# ── SSH client config for the cluster nodes ────────────────────────────────
+# The cluster key itself is bind-mounted at runtime (see devcontainer.json).
+# /home/dev/.config must exist and be dev-owned *before* the nvim bind-mount is
+# attached over /home/dev/.config/nvim, otherwise Podman creates the parent as
+# root and tools like k9s cannot create their own config subdir.
+RUN mkdir -p /home/dev/.ssh /home/dev/.cache /home/dev/.config \
+ && chmod 700 /home/dev/.ssh \
+ && printf '%s\n' \
+      'Host k8s-cp-01 k8s-worker-01 k8s-worker-02' \
+      '    User ratlab' \
+      '    IdentityFile ~/.ssh/k8s-homelab-kvm' \
+      '    IdentitiesOnly yes' \
+      '    StrictHostKeyChecking accept-new' \
+      '    ServerAliveInterval 30' \
+      > /home/dev/.ssh/config \
+ && chmod 600 /home/dev/.ssh/config \
+ && chown -R dev:dev /home/dev

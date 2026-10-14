@@ -1,0 +1,29 @@
+hotKeys:
+  shift-0:
+    shortCut: Shift-0
+    description: Nodes (the two VMs as k8s nodes)
+    command: nodes
+  shift-1:
+    shortCut: Shift-1
+    description: Pods (all namespaces)
+    command: pods
+  shift-2:
+    shortCut: Shift-2
+    description: Deployments
+    command: dp
+  shift-3:
+    shortCut: Shift-3
+    description: Services
+    command: services
+  shift-4:
+    shortCut: Shift-4
+    description: Events
+    command: events
+  shift-5:
+    shortCut: Shift-5
+    description: Namespaces
+    command: namespaces
+  shift-h:
+    shortCut: Shift-H
+    description: Cluster health (pulses)
+    command: pulses
