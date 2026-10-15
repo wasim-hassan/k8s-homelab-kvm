@@ -15,6 +15,12 @@ spec:
       labels:
         app: podinfo
     spec:
+      serviceAccountName: podinfo
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: podinfo
           image: ghcr.io/stefanprodan/podinfo:6.7.1
@@ -35,3 +41,9 @@ spec:
                   name: podinfo-message
                   key: PODINFO_UI_MESSAGE
                   optional: false
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL

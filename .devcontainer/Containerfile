@@ -17,6 +17,7 @@ ARG YQ_VERSION=v4.54.1
 ARG NVIM_VERSION=v0.12.6
 ARG FLUX_VERSION=2.9.6
 ARG SOPS_VERSION=3.13.3
+ARG TRIVY_VERSION=0.75.0
 
 # ── Base packages + non-root user ─────────────────────────────────────────
 # The project scripts need bash, python3 + PyYAML (inventory parsing),
@@ -131,6 +132,24 @@ RUN curl -fsSL --retry 3 --retry-delay 2 -o /tmp/sops \
  && install -m 0755 /tmp/sops /usr/local/bin/sops \
  && command rm -f /tmp/sops /tmp/sops_checksums.txt
 
+# ── trivy (checksum verified) ──────────────────────────────────────────────
+# Trivy is the single security scanner (Phase 7). `trivy config` lints
+# manifests/IaC against built-in policies (replaces kube-linter; no vulnerability
+# DB needed); Phase 8 adds `trivy image` / `fs --scanners vuln,secret` + SBOM for
+# the CI supply chain. Pinned to a post-incident release: the 2026-03 supply-chain
+# compromise shipped a malicious 0.69.4, so never pin that version.
+RUN curl -fsSL --retry 3 --retry-delay 2 -o /tmp/trivy.tar.gz \
+      "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+ && curl -fsSL --retry 3 --retry-delay 2 -o /tmp/trivy_checksums.txt \
+      "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_checksums.txt" \
+ && expected="$(grep -E " trivy_${TRIVY_VERSION}_Linux-64bit\.tar\.gz$" /tmp/trivy_checksums.txt | awk '{print $1}')" \
+ && actual="$(sha256sum /tmp/trivy.tar.gz | awk '{print $1}')" \
+ && echo "trivy checksum expected=${expected} actual=${actual}" \
+ && [ -n "$expected" ] && [ "$expected" = "$actual" ] \
+ && tar -xzf /tmp/trivy.tar.gz -C /tmp trivy \
+ && install -m 0755 /tmp/trivy /usr/local/bin/trivy \
+ && command rm -f /tmp/trivy.tar.gz /tmp/trivy_checksums.txt /tmp/trivy
+
 # ── SSH client config for the cluster nodes ────────────────────────────────
 # The cluster key itself is bind-mounted at runtime (see devcontainer.json).
 # /home/dev/.config must exist and be dev-owned *before* the nvim bind-mount is
@@ -148,3 +167,9 @@ RUN mkdir -p /home/dev/.ssh /home/dev/.cache /home/dev/.config \
       > /home/dev/.ssh/config \
  && chmod 600 /home/dev/.ssh/config \
  && chown -R dev:dev /home/dev
+
+# ── Run as the non-root `dev` user ─────────────────────────────────────────
+# The runtime already sets containerUser/remoteUser to dev (devcontainer.json);
+# declaring it in the image keeps the default non-root (trivy DS-0002) and means
+# `podman run` of this image never starts as root by default.
+USER dev

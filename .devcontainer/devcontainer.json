@@ -34,7 +34,7 @@
     "K9S_CONFIG_DIR": "/home/dev/.config/k9s"
   },
 
-  "postCreateCommand": "kubectl version --client && helm version --short && terraform version | head -1 && k9s version --short && yq --version && nvim --version | head -1 && flux --version && sops --version && age --version",
+  "postCreateCommand": "kubectl version --client && helm version --short && terraform version | head -1 && k9s version --short && yq --version && nvim --version | head -1 && flux --version && sops --version && age --version && trivy --version",
 
   "customizations": {}
 }

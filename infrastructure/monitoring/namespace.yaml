@@ -4,3 +4,14 @@ metadata:
   name: monitoring
   labels:
     name: monitoring
+    # node-exporter needs hostNetwork + hostPID + hostPath, which no restricted
+    # or baseline level allows, so this namespace is enforced privileged. The
+    # remaining stack (Grafana, Prometheus, kube-state-metrics, operator) already
+    # satisfies restricted; warn/audit at baseline surface anything beyond it.
+    # See docs/adr/0007-security-hardening.md.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: baseline
+    pod-security.kubernetes.io/warn-version: latest
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/audit-version: latest
