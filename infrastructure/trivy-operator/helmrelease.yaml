@@ -27,13 +27,14 @@ spec:
       name: RetryOnFailure
       retryInterval: 5m
   values:
-    # Enable ServiceMonitor so kube-prometheus-stack scrapes metrics
+    # Scrape the operator's metrics with the existing kube-prometheus-stack
+    # (its Prometheus selects ServiceMonitors labelled release=kube-prometheus-stack).
     serviceMonitor:
       enabled: true
       labels:
         release: kube-prometheus-stack
 
-    # Resource limits for small cluster
+    # Operator Deployment resource limits (small 2-node cluster).
     resources:
       requests:
         cpu: 100m
@@ -42,64 +43,74 @@ spec:
         cpu: 500m
         memory: 256Mi
 
-    # Operator replicas
-    operator:
-      replicas: 1
-      scanJobsConcurrentLimit: 2
-      scanJobTimeout: 5m
-      # Enable info metrics for Grafana dashboard
-      metricsExposedSecretInfo: true
-      metricsRbacAssessmentInfo: true
-      metricsClusterComplianceInfo: true
-      metricsConfigAuditInfo: true
-      # Disable node-collector/infra assessment (needs hostPath/root)
-      infraAssessmentScannerEnabled: false
-      # PSS restricted compliance for operator pod
-      podSecurityContext:
-        runAsNonRoot: true
-        runAsUser: 10000
-        runAsGroup: 10000
-        fsGroup: 10000
-        seccompProfile:
-          type: RuntimeDefault
-      securityContext:
-        privileged: false
-        allowPrivilegeEscalation: false
-        readOnlyRootFilesystem: true
-        runAsNonRoot: true
-        runAsUser: 10000
-        runAsGroup: 10000
-        capabilities:
-          drop:
-            - ALL
-
-    # Scan job PSS compliance (trivy scan image runs as root; force non-root UID)
-    scanJobPodTemplatePodSecurityContext:
+    # PSS restricted compliance for the operator pod. The image already runs as
+    # uid 10000 (non-root); runAsNonRoot + seccompProfile are required by the
+    # restricted Pod Security Standard enforced on trivy-system.
+    podSecurityContext:
       runAsNonRoot: true
       runAsUser: 10000
       runAsGroup: 10000
       fsGroup: 10000
       seccompProfile:
         type: RuntimeDefault
-    scanJobPodTemplateContainerSecurityContext:
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop:
-          - ALL
+
+    securityContext:
       privileged: false
+      allowPrivilegeEscalation: false
       readOnlyRootFilesystem: true
       runAsNonRoot: true
       runAsUser: 10000
-      seccompProfile:
-        type: RuntimeDefault
+      runAsGroup: 10000
+      capabilities:
+        drop:
+          - ALL
 
-    # Trivy scanner config (standalone)
+    operator:
+      replicas: 1
+      # Throttle scan jobs on the small cluster.
+      scanJobsConcurrentLimit: 2
+      scanJobTimeout: 5m
+      # Extra info metrics so the Grafana dashboard has data.
+      metricsExposedSecretInfo: true
+      metricsRbacAssessmentInfo: true
+      metricsClusterComplianceInfo: true
+      metricsConfigAuditInfo: true
+      # Node-collector (infra assessment) needs hostPath + root, which is
+      # incompatible with PSS restricted. Disable it: we keep image CVE,
+      # config-audit, exposed-secret and RBAC scans, all of which run as
+      # unprivileged scan jobs. See docs/adr/0008-trivy-operator.md.
+      infraAssessmentScannerEnabled: false
+
+    # PSS restricted compliance for scan job pods. The Trivy scanner image runs
+    # as root by default, so we force a non-root uid. The operator mounts an
+    # emptyDir at /tmp, so readOnlyRootFilesystem stays true.
+    trivyOperator:
+      scanJobPodTemplatePodSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        fsGroup: 10000
+        seccompProfile:
+          type: RuntimeDefault
+      scanJobPodTemplateContainerSecurityContext:
+        allowPrivilegeEscalation: false
+        privileged: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        seccompProfile:
+          type: RuntimeDefault
+        capabilities:
+          drop:
+            - ALL
+
+    # Trivy scanner (standalone mode: each scan job downloads the DB to its
+    # emptyDir /tmp, so no server component or PVC is needed).
     trivy:
       mode: Standalone
       ignoreUnfixed: true
-      cacheDir: /tmp/trivy/.cache
       imageScanCacheDir: /tmp/trivy/.cache
-      filesystemScanCacheDir: /var/trivyoperator/trivy-db
       resources:
         requests:
           cpu: 100m
@@ -107,6 +118,3 @@ spec:
         limits:
           cpu: 500m
           memory: 512Mi
-
-    # Scan jobs
-    scanJobTimeout: 5m
