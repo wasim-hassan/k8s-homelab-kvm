@@ -1,0 +1,24 @@
+# .trivyignore — accepted deviations for `trivy config`
+#
+# Each entry is an explicit, reviewed risk acceptance. Rationale lives in
+# docs/adr/0007-security-hardening.md (see "Accepted deviations"). Keep this
+# list short and justified; do not add IDs without a documented reason.
+
+# DS-0026 — No HEALTHCHECK defined.
+# The .devcontainer/Containerfile builds an operator *workspace*, not a
+# long-running service. A HEALTHCHECK has no meaning here.
+DS-0026
+
+# KSV-0020 / KSV-0021 — Runs with UID/GID <= 10000.
+# podinfo intentionally runs as its image's own non-root user (uid 100 app /
+# gid 101). PSS `restricted` only requires non-root, not a UID > 10000; matching
+# the image user avoids unexpected permission failures. Enforced via numeric
+# runAsUser/runAsGroup (see apps/podinfo/deployment.yaml).
+KSV-0020
+KSV-0021
+
+# KSV-0125 — Image from an untrusted registry.
+# ghcr.io is GitHub's container registry (FOSS, trusted by this project); the
+# check's default trusted list is Docker Hub-centric. The image is
+# ghcr.io/stefanprodan/podinfo, pinned to 6.7.1.
+KSV-0125

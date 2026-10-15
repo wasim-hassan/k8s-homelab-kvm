@@ -406,9 +406,43 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
   (a Phase 3 evolution) — see [runbook 07](runbooks/07-flux-webui.md) and
   [ADR-0006](adr/0006-flux-operator-managed.md). Requires `192.168.123.11 flux.local`
   in the host `/etc/hosts` (manual, needs sudo).
-- Next: **Phase 7 (Security hardening)** — RBAC, Pod Security Standards, secrets
-  hygiene audit. NetworkPolicy waits on Phase 4 (Cilium). Phase 6 is complete —
-  see [runbook 06](runbooks/06-observability.md).
+- **Phase 7 (Security hardening)** — done 2026-10-15: RBAC audit + least-privilege for `podinfo`, PSS applied (podinfo/envoy/flux-system `restricted`, monitoring `privileged` with documented node-exporter exception), trivy v0.75.0 pinned + checksum-verified in devcontainer, secrets hygiene audit (SOPS-only). NetworkPolicy waits on Phase 4 (Cilium). See [runbook 08](runbooks/08-security-hardening.md) and [ADR-0007](adr/0007-security-hardening.md). Phase 6 is complete — see [runbook 06](runbooks/06-observability.md).
+
+---
+
+## Security (Phase 7)
+
+Verified 2026-10-15. See [ADR-0007](adr/0007-security-hardening.md) and [runbook 08](runbooks/08-security-hardening.md).
+
+**Scanner (single tool):** **Trivy v0.75.0** — pinned + SHA256-verified in `.devcontainer/Containerfile` (`trivy_0.75.0_Linux-64bit.tar.gz` vs `trivy_0.75.0_checksums.txt`). `trivy config` = manifest/IaC policy (kube-linter replacement, no vuln DB); `trivy fs --scanners secret` = secret scan; image CVE/SBOM deferred to Phase 8. Containerfile now ends `USER dev`.
+
+**RBAC (cluster-admin holders — all required, no stray grants):**
+
+| ClusterRoleBinding | Subjects |
+|---|---|
+| `cluster-admin` | Group `system:masters` (built-in) |
+| `cluster-reconciler-flux-system` | `kustomize-controller`, `helm-controller` |
+| `flux-operator` | `flux-operator` |
+| `helm-kube-system-gateway-api-crd` | `helm-gateway-api-crd` (CRD install job) |
+
+- `podinfo` uses dedicated `ServiceAccount podinfo`, `automountServiceAccountToken: false`, **no** Role/RoleBinding (no API access).
+- Flux Web UI: `ClusterRoleBinding flux-admin → ClusterRole flux-web-admin` (**not** cluster-admin); host-only at `flux.local`.
+- Non-default ServiceAccounts: only Flux (5), Gateway (3), monitoring (5), kube-system built-ins.
+
+**Pod Security Standards (namespace labels):**
+
+| Namespace | enforce | warn / audit | Note |
+|---|---|---|---|
+| `podinfo` | **restricted** | restricted | Deployment hardened (runAsNonRoot, numeric uid 100, RuntimeDefault seccomp, drop ALL, no priv-esc, read-only rootfs) |
+| `envoy-gateway-system` | **restricted** | restricted | Verified: no hostPort/hostNetwork; only configMap/secret/emptyDir/projected volumes |
+| `flux-system` | **restricted** | restricted | **Applied imperatively** (namespace is Flux Operator–owned; see ADR-0007) |
+| `monitoring` | **privileged** | baseline | node-exporter needs `hostNetwork`+`hostPID`+`hostPath` — documented exception; other monitoring pods satisfy restricted |
+| `default`, `kube-public`, `kube-node-lease` | — | — | No workloads / system-managed |
+| `kube-system` | — | — | System-managed (k3s) |
+
+**Secrets hygiene:** `trivy fs --scanners secret .` → **0 secrets**. Only SOPS ciphertext tracked (`apps/podinfo/secret.sops.yaml`, `infrastructure/monitoring/secret.sops.yaml`); `.sops.yaml` holds only the public age recipient; private key at `~/.config/sops/age/keys.txt` (never committed); `.gitignore` covers `.env`, `*.agekey`, `keys.txt`, `tfstate`, `AGENTS.local.md`.
+
+**Not done here:** NetworkPolicy — deferred until a policy-capable CNI (Phase 4/Cilium).
 
 ---
 

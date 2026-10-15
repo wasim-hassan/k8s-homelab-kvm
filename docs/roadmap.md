@@ -6,19 +6,23 @@ block each phase. This is also the **resume point** for a new session: read the
 
 - **Last updated:** 2026-10-15
 - **Done so far:** Phases 0–3 (substrate, k3s cluster, operator workspace + k9s,
-  GitOps: Flux CD + SOPS/age, Envoy Gateway, first workload) — see
+  GitOps: Flux CD + SOPS/age, Envoy Gateway, first workload), Phase 5 (scripts),
+  Phase 6 (observability), Phase 7 (security hardening) — see
   [system-inventory.md](system-inventory.md#current-phase-status).
 - **Last verified:** 2026-10-15
 - **Done so far (verified):** substrate (KVM/libvirt/VMs), k3s cluster,
   Devpod workspace, k9s, GitOps (Flux + SOPS/age + Envoy Gateway + podinfo),
-  the observability stack (kube-prometheus-stack), and the **Flux Web UI**
-  (Flux migrated to the **Flux Operator**, [ADR-0006](adr/0006-flux-operator-managed.md)).
-- **Current focus:** Phase 7 (Security hardening).
+  the observability stack (kube-prometheus-stack), the **Flux Web UI**
+  (Flux migrated to the **Flux Operator**, [ADR-0006](adr/0006-flux-operator-managed.md)),
+  and **Phase 7 security hardening** (trivy, PSS, RBAC, secrets hygiene,
+  [ADR-0007](adr/0007-security-hardening.md)).
+- **Current focus:** Phase 8 (CI/CD + image automation).
   Phase 3 (GitOps) done 2026-10-14; Phase 5 (IaC) re-scoped 2026-10-15
   ([ADR-0005](adr/0005-no-ansible-node-config.md)); Phase 6 (Observability)
   **done** 2026-10-15; Flux moved to operator-managed + Web UI **done** 2026-10-15
-  ([runbook 07](runbooks/07-flux-webui.md)).
-- **Remaining:** Phase 7, Phase 8, and the deferred/stretch items.
+  ([runbook 07](runbooks/07-flux-webui.md)); Phase 7 (Security) **done**
+  2026-10-15 ([runbook 08](runbooks/08-security-hardening.md)).
+- **Remaining:** Phase 8 and the deferred/stretch items.
 
 ### Next phase — Phase 7 (security hardening)
 - **Objective.** Add real security posture to the cluster without adding weight.
@@ -43,7 +47,7 @@ block each phase. This is also the **resume point** for a new session: read the
 | 4 | CNI migration → Cilium (+ Hubble) | 💤 skip for now | Decision 1 → **skip Cilium** |
 | 5 | IaC — kept as scripts; **Ansible dropped, Terraform deferred** ([ADR-0005](adr/0005-no-ansible-node-config.md)) | ➖ re-scoped | — |
 | 6 | Observability stack (Prometheus + Grafana; Alertmanager off) | ✅ done | — |
-| 7 | Security hardening (RBAC, NetworkPolicy, PSS) | ⏳ next | Phase 4 for NetworkPolicy |
+| 7 | Security hardening (RBAC, PSS, secrets hygiene; NetworkPolicy deferred) | ✅ done | — (NetworkPolicy → Phase 4) |
 | 8 | CI/CD + image automation | ⏳ | — (Phase 3 done) |
 | — | Stretch: Talos, storage (Longhorn), backup (Velero) | 💤 later | — |
 
@@ -176,12 +180,24 @@ ship with the chart.
 
 ## Phase 7 — Security hardening
 
-- **RBAC:** least-privilege ServiceAccounts; no cluster-admin for workloads.
+> **Status: ✅ complete (2026-10-15).** Implemented in
+> [`apps/podinfo/`](../apps/podinfo), [`infrastructure/`](../infrastructure) and
+> `.devcontainer/Containerfile`. Procedure + verification:
+> [runbook 08](runbooks/08-security-hardening.md), [ADR-0007](adr/0007-security-hardening.md).
+
+- **Scanner:** **Trivy v0.75.0** pinned + checksum-verified in the workspace image
+  as the single scanner (`trivy config` now; image/vuln/SBOM in Phase 8).
+- **RBAC:** least-privilege ServiceAccounts; no cluster-admin for workloads —
+  `podinfo` has a dedicated SA with automount disabled and no bindings; all
+  cluster-admin holders are required Flux/Gateway/system components.
 - **NetworkPolicy:** pod-to-pod segmentation (needs a policy-capable CNI → after
-  Phase 4).
-- **Pod Security Standards** (`restricted` where possible), non-root, read-only
-  root FS.
-- **Secrets hygiene:** audit that only SOPS-encrypted secrets are in git.
+  Phase 4). **Still deferred.**
+- **Pod Security Standards:** `restricted` enforced on `podinfo`,
+  `envoy-gateway-system`, `flux-system`; `privileged` (+ baseline warn/audit) on
+  `monitoring` for the node-exporter exception. Non-root, read-only root FS on
+  podinfo.
+- **Secrets hygiene:** audited — only SOPS-encrypted secrets in git; `trivy fs
+  --scanners secret` reports 0.
 
 ---
 
@@ -216,6 +232,7 @@ repo's memory is complete.
 | 4 | Observability sizing | **Bump VM RAM + trim the stack.** `k8s-cp-01` 3 GiB, `k8s-worker-01` 1536 MiB; `kube-prometheus-stack` with Alertmanager off, Prometheus `6h`/2Gi. Resolved 2026-10-15 — see [Phase 6](#phase-6--observability-stack). |
 | 5 | Config management (Ansible?) | **No Ansible** — keep `10-prepare-nodes.sh`; Terraform-libvirt deferred (redundant with the external provisioner); Talos is the long-term replacement. [ADR-0005](adr/0005-no-ansible-node-config.md). |
 | 6 | Flux status / Web UI | **Flux Web UI via the Flux Operator** — migrate Flux to operator-managed (`FluxInstance`) and expose the Flux Status UI at `flux.local`. Weave GitOps ruled out (unmaintained + breaks on HelmRelease `v2`); `fluxcd/webui` archived. [ADR-0006](adr/0006-flux-operator-managed.md), [runbook 07](runbooks/07-flux-webui.md). |
+| 7 | Security scanner (kube-linter vs trivy) | **Trivy v0.75.0, single scanner** — kube-linter only lints manifests and cannot do image CVE / secrets / SBOM, so it cannot cover Phase 8; trivy's `config` mode replaces kube-linter and its image/secret/SBOM modes cover the rest. Pinned ≥ 0.75.0 (avoid malicious `0.69.4`). [ADR-0007](adr/0007-security-hardening.md). |
 
 The option tables for decisions 1–3 are preserved in git history; the
 resolutions above supersede them.
@@ -235,7 +252,7 @@ To pick this up in a new session:
 
 1. Start the environment — [runbook 03](runbooks/03-session-lifecycle.md)
    (`kvm on` → `vm start k8s-cp-01` → `vm start k8s-worker-01` → `devpod up . --ide none`).
-2. Decisions **1–5** are all resolved ([above](#resolved-decisions)).
+2. Decisions **1–7** are all resolved ([above](#resolved-decisions)).
 3. Git checkpoint is **done** — repo initialized, committed, pushed to private
    GitHub, so Flux diffs will be legible.
 4. Phase 3 **done** (2026-10-14): Flux bootstrapped, `sops-age` wired, Envoy
@@ -250,9 +267,14 @@ To pick this up in a new session:
    (`FluxInstance`), Web UI at `flux.local` ([ADR-0006](adr/0006-flux-operator-managed.md),
    [runbook 07](runbooks/07-flux-webui.md)). Add `192.168.123.11 flux.local` to
    the host `/etc/hosts`.
-8. **Next: Phase 7 (security hardening)** — RBAC least-privilege, Pod Security
-   Standards, and a secrets-hygiene audit (only SOPS-encrypted secrets in git).
-   NetworkPolicy is deferred until Phase 4 (Cilium).
+8. **Phase 7 done** (2026-10-15): trivy v0.75.0 pinned + checksum-verified,
+   podinfo hardened + dedicated SA, PSS enforced on `podinfo`/`envoy-gateway-system`/
+   `flux-system` (`restricted`) and `monitoring` (`privileged`, node-exporter
+   exception), secrets-hygiene audit clean. NetworkPolicy is deferred until
+   Phase 4 (Cilium). See [runbook 08](runbooks/08-security-hardening.md),
+   [ADR-0007](adr/0007-security-hardening.md).
+9. **Next: Phase 8 (CI/CD + image automation)** — build images in CI, push to a
+   registry, Flux image automation, and wire `trivy image`/SBOM into the pipeline.
 
 ---
 

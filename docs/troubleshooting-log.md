@@ -959,3 +959,34 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   **and** the objects' annotations — a manager that marks its objects
   `prune: Disabled` will not lose them.
 
+## 2026-10-15 — PSS `restricted`: podinfo `CreateContainerConfigError` (runAsNonRoot + non-numeric image user)
+
+- **Context:** Phase 7 hardening set `runAsNonRoot: true` on the podinfo pod and
+  `enforce: restricted` on the `podinfo` namespace. The new pod failed to start.
+- **Symptom:**
+  ```
+  kubectl -n podinfo get pods
+  # podinfo-7d6c6f698f-... 0/1 CreateContainerConfigError
+  kubectl -n podinfo describe pod ...
+  # Error: container has runAsNonRoot and image has non-numeric user (app),
+  #        cannot verify user is non-root
+  ```
+- **Root cause:** podinfo's image declares `USER app` (a *name*, not a *number*;
+  at runtime it is `uid=100(app) gid=101(app)`). With `runAsNonRoot: true` and no
+  explicit `runAsUser`, the kubelet cannot prove the user is non-root and refuses
+  to start the container.
+- **Fix:** pin a numeric user/group in the pod `securityContext`:
+  ```yaml
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 100     # matches the image's `app` user
+    runAsGroup: 101
+    fsGroup: 101
+    seccompProfile: { type: RuntimeDefault }
+  ```
+  Then `flux reconcile kustomization apps --with-source` →
+  `kubectl -n podinfo rollout status deploy/podinfo` → *successfully rolled out*.
+- **Lesson:** `runAsNonRoot: true` + an image with a **named** (non-numeric) user
+  = `CreateContainerConfigError`. Always set a numeric `runAsUser` to make the
+  non-root guarantee verifiable at admission time. Check the image's real UID
+  (`kubectl exec ... -- id`) before enforcing `restricted`.

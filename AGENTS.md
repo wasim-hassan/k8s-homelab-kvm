@@ -12,7 +12,7 @@ every change is verified and documented.
 |---|---|
 | [`docs/roadmap.md`](docs/roadmap.md) | phases, **open decisions**, next actions |
 | [`docs/system-inventory.md`](docs/system-inventory.md) | verified host/cluster/workspace state |
-| [`docs/runbooks/`](docs/runbooks) | do-this procedures (01 install, 02 workspace, 03 session, 04 k9s, 05 GitOps/Flux, 06 observability, 07 Flux Web UI) |
+| [`docs/runbooks/`](docs/runbooks) | do-this procedures (01 install, 02 workspace, 03 session, 04 k9s, 05 GitOps/Flux, 06 observability, 07 Flux Web UI, 08 security hardening) |
 | [`docs/adr/`](docs/adr) | *why* each decision was made |
 | [`docs/troubleshooting-log.md`](docs/troubleshooting-log.md) | every real failure: symptom → cause → fix → lesson |
 

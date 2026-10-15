@@ -21,6 +21,7 @@ to the Flux Operator). **Phase 7 (security hardening) is next.** See the
 | 05 | [GitOps with Flux CD](runbooks/05-gitops-flux.md) | Flux bootstrap, SOPS/age, Envoy Gateway, podinfo workload |
 | 06 | [Observability](runbooks/06-observability.md) | kube-prometheus-stack via Flux, Grafana route, Prometheus targets |
 | 07 | [Flux Web UI](runbooks/07-flux-webui.md) | migrate Flux to the Flux Operator, Flux Status UI at `flux.local` |
+| 08 | [Security hardening](runbooks/08-security-hardening.md) | trivy scanner, PSS per namespace, RBAC, secrets hygiene |
 
 ## ADRs (why)
 
@@ -32,6 +33,7 @@ to the Flux Operator). **Phase 7 (security hardening) is next.** See the
 | 0004 | [Ingress / Gateway API strategy](adr/0004-gateway-api-and-ingress.md) *(accepted — Envoy Gateway)* |
 | 0005 | [No Ansible — node config stays scripted](adr/0005-no-ansible-node-config.md) *(accepted)* |
 | 0006 | [Flux managed by the Flux Operator (Web UI)](adr/0006-flux-operator-managed.md) *(accepted)* |
+| 0007 | [Security hardening (trivy, PSS, RBAC)](adr/0007-security-hardening.md) *(accepted)* |
 
 ## Reference
 
