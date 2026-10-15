@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trivy-system
+  labels:
+    name: trivy-system
+    # Trivy Operator pods and scan jobs must comply with restricted for
+    # consistency with Phase 7 hardening. Scan jobs run in workload namespaces
+    # by default; the operator's securityContext defaults are tuned for
+    # restricted. This is evaluated at admission for pods created in this ns.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest

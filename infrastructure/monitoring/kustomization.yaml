@@ -7,3 +7,4 @@ resources:
   - secret.sops.yaml
   - grafana-httproute.yaml
   - referencegrant.yaml
+  - dashboards/trivy-operator-dashboard.yaml

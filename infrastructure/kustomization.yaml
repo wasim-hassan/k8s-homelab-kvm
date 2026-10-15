@@ -4,3 +4,4 @@ resources:
   - envoy-gateway
   - monitoring
   - flux-operator
+  - trivy-operator

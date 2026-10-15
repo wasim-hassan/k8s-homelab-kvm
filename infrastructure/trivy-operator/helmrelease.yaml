@@ -1,0 +1,112 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: trivy-operator
+  namespace: trivy-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: trivy-operator
+      version: "0.37.0"
+      sourceRef:
+        kind: HelmRepository
+        name: aqua
+        namespace: trivy-system
+      interval: 12h
+  install:
+    crds: Create
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+    strategy:
+      name: RetryOnFailure
+      retryInterval: 5m
+  values:
+    # Enable ServiceMonitor so kube-prometheus-stack scrapes metrics
+    serviceMonitor:
+      enabled: true
+      labels:
+        release: kube-prometheus-stack
+
+    # Resource limits for small cluster
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    # Operator replicas
+    operator:
+      replicas: 1
+      scanJobsConcurrentLimit: 2
+      scanJobTimeout: 5m
+      # Enable info metrics for Grafana dashboard
+      metricsExposedSecretInfo: true
+      metricsRbacAssessmentInfo: true
+      metricsClusterComplianceInfo: true
+      metricsConfigAuditInfo: true
+      # Disable node-collector/infra assessment (needs hostPath/root)
+      infraAssessmentScannerEnabled: false
+      # PSS restricted compliance for operator pod
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        fsGroup: 10000
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        capabilities:
+          drop:
+            - ALL
+
+    # Scan job PSS compliance (trivy scan image runs as root; force non-root UID)
+    scanJobPodTemplatePodSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 10000
+      runAsGroup: 10000
+      fsGroup: 10000
+      seccompProfile:
+        type: RuntimeDefault
+    scanJobPodTemplateContainerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      privileged: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 10000
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Trivy scanner config (standalone)
+    trivy:
+      mode: Standalone
+      ignoreUnfixed: true
+      cacheDir: /tmp/trivy/.cache
+      imageScanCacheDir: /tmp/trivy/.cache
+      filesystemScanCacheDir: /var/trivyoperator/trivy-db
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+    # Scan jobs
+    scanJobTimeout: 5m
