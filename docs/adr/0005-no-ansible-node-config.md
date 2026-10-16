@@ -69,7 +69,7 @@ host-config layer rather than adding a tool for it.
 
 **Neutral**
 
-- `ansible/` stays empty (and untracked — nothing to remove from git).
+- `ansible/` was never tracked and has been removed; node config stays scripted.
 - `terraform/` keeps only `libvirt-k8s-net.xml` for reference.
 
 ## Revisit when

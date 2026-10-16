@@ -33,7 +33,7 @@ namespaces)** and jumps anywhere with one keystroke.
 which it reads *everything*: the static `config.yaml`, `hotkeys.yaml`,
 `skins/`, and the dynamic per-context state under `clusters/`.
 
-That directory is **inside this repo** — [`../config/k9s/`](../config/k9s) — and
+That directory is **inside this repo** — [`../../config/k9s/`](../../config/k9s) — and
 is bind-mounted into the workspace at `/home/dev/.config/k9s`. Your `$HOME` gets
 **no** new dotfiles; the config is version-controllable with the rest of the
 project.
