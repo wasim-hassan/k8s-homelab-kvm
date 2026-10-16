@@ -118,7 +118,7 @@ jobs:
           upload-release-assets: false
 
       - name: Attest build provenance
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.event.repository.private == false
         uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.IMAGE }}
