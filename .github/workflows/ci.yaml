@@ -75,7 +75,7 @@ jobs:
 
       - name: Trivy image scan
         if: github.event_name != 'pull_request'
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
