@@ -55,7 +55,7 @@ forward plan is now the [stretch items](#stretch-later).
 | 6 | Observability stack (Prometheus + Grafana; Alertmanager off) | ✅ done | — |
 | 7 | Security hardening (RBAC, PSS, secrets hygiene; NetworkPolicy deferred) | ✅ done | — (NetworkPolicy → Phase 4) |
 | 7b | Continuous security scanning (Trivy Operator + Grafana dashboard) | ✅ done | — |
-| 8 | CI/CD + image automation | ⏳ | — (Phase 3 done) |
+| 8 | CI/CD + image automation | ✅ done | — |
 | — | Stretch: Talos, storage (Longhorn), backup (Velero) | 💤 later | — |
 
 ---
@@ -332,8 +332,9 @@ To pick this up in a new session:
     SBOM + provenance) and **Flux image automation** (image-reflector +
     image-automation controllers, `ImageRepository`/`ImagePolicy`/
     `ImageUpdateAutomation`, SOPS write key) driving the `ratlab-demo` workload.
-    Verified end-to-end: `ImagePolicy` → `0.1.1`, Flux committed the tag bump
-    (`ec32534`), `ratlab-demo` is `Running`. See
+    Verified end-to-end and hands-off across `v0.1.1`→`v0.1.3`: `ImagePolicy`
+    → `0.1.3`, Flux committed the tag bump (`2478343`), `ratlab-demo` is
+    `Running` on `0.1.3`. See
     [ADR-0009](adr/0009-ci-cd-image-automation.md),
     [runbook 09](runbooks/09-ci-cd-image-automation.md).
 

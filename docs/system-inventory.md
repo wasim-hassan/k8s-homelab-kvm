@@ -397,7 +397,7 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 | 7b | **Trivy Operator** + Grafana dashboard (continuous scanning); `flux-system` PSS labels made declarative ([ADR-0008](adr/0008-trivy-operator.md)) | ✅ done |
 | 8 | CI/CD — GitHub Actions builds `ratlab-demo` → GHCR (trivy + SBOM + provenance) ([ADR-0009](adr/0009-ci-cd-image-automation.md)) | ✅ done |
 | 8 | Flux image automation — image-reflector + image-automation controllers, ImageRepository/ImagePolicy/ImageUpdateAutomation, SOPS write key ([ADR-0009](adr/0009-ci-cd-image-automation.md)) | ✅ done |
-| 8 | `ratlab-demo` workload deployed via Flux (Deployment/Service/HTTPRoute), image tag managed by Flux | ⏳ pending manual GHCR visibility + write deploy key |
+| 8 | `ratlab-demo` workload deployed via Flux (Deployment/Service/HTTPRoute), image tag managed by Flux | ✅ done |
 
 ### Deferred / not yet done
 
@@ -409,8 +409,9 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
   is bind-mounted read-only into the workspace.
 - The **Flux Web UI** was added 2026-10-15 by migrating Flux to the Flux Operator
   (a Phase 3 evolution) — see [runbook 07](runbooks/07-flux-webui.md) and
-  [ADR-0006](adr/0006-flux-operator-managed.md). Requires `192.168.123.11 flux.local`
-  in the host `/etc/hosts` (manual, needs sudo).
+  [ADR-0006](adr/0006-flux-operator-managed.md). Requires host `/etc/hosts`
+  entries (manual, needs sudo): `192.168.123.11 flux.local`, `grafana.local`,
+  `ratlab-demo.local` (and `podinfo.local` if the podinfo route is wanted).
 - **Phase 7 (Security hardening)** — done 2026-10-15: RBAC audit + least-privilege for `podinfo`, PSS applied (podinfo/envoy/flux-system `restricted`, monitoring `privileged` with documented node-exporter exception), trivy v0.75.0 pinned + checksum-verified in devcontainer, secrets hygiene audit (SOPS-only). NetworkPolicy waits on Phase 4 (Cilium). See [runbook 08](runbooks/08-security-hardening.md) and [ADR-0007](adr/0007-security-hardening.md). Phase 6 is complete — see [runbook 06](runbooks/06-observability.md).
 - **Phase 7b (Trivy Operator)** — done 2026-10-16: continuous in-cluster scanning (image/config/secret/RBAC) via the Trivy Operator, results in a Grafana dashboard; infra-assessment disabled to stay `restricted`. `flux-system` PSS labels moved from imperative to declarative (`FluxInstance.spec.commonMetadata`); `podinfo` remediated to 6.15.0 (findings triage). See [ADR-0008](adr/0008-trivy-operator.md).
 
@@ -505,18 +506,20 @@ Added 2026-10-16. See [ADR-0009](adr/0009-ci-cd-image-automation.md) and
 `1/1 Running`; CRDs `imagerepositories/imagepolicies/imageupdateautomations`
 present. Both one-time GitHub steps are done: the **write deploy key** is added
 (`GitRepository/flux-git-write` `Ready=True`) and the **GHCR package is public**
-(`ImageRepository` `Ready`, scan finds 6 tags). `ImagePolicy` resolved **`0.1.1`**,
-`ImageUpdateAutomation` committed **`ec32534 chore(image-automation): update
-ratlab-demo image`** to `main`, and the `apps` Kustomization rolled the new tag
-out — `ratlab-demo` pod is **`1/1 Running`** on `ghcr.io/wasim-hassan/ratlab-demo:0.1.1`.
-`curl -H 'Host: ratlab-demo.local' http://192.168.123.11/version` returns
-`{"version":"0.1.1",...}`. CI runs are green (`v0.1.1` + `main`).
+(`ImageRepository` `Ready`, scans every 5m). The loop was observed fully
+**hands-off** across three releases (`v0.1.1` → `v0.1.2` → `v0.1.3`): on each
+tag `ImagePolicy` resolved the new semver on its own interval,
+`ImageUpdateAutomation` committed the tag bump to `main`, and the `apps`
+Kustomization rolled it out — no manual edit. Final state: `ImagePolicy` →
+**`0.1.3`**, commit **`2478343 chore(image-automation): update ratlab-demo
+image`**, pod **`1/1 Running`** on `ghcr.io/wasim-hassan/ratlab-demo:0.1.3`;
+`curl http://ratlab-demo.local/version` returns `{"version":"0.1.3",...}`.
 
 ---
 
 ## GitOps state (Phase 3 — Flux CD, now operator-managed)
 
-Verified 2026-10-16, reconciled at `main@sha1:8c2d051`.
+Verified 2026-10-16, reconciled at `main@sha1:2478343`.
 
 | Item | Value |
 |---|---|
@@ -524,7 +527,7 @@ Verified 2026-10-16, reconciled at `main@sha1:8c2d051`.
 | Managed by | **Flux Operator 0.61.0** via `FluxInstance flux` — migrated from CLI bootstrap 2026-10-15 ([ADR-0006](adr/0006-flux-operator-managed.md), [runbook 07](runbooks/07-flux-webui.md)) |
 | Git source | `ssh://git@github.com/wasim-hassan/k8s-homelab-kvm` (`refs/heads/main`, path `clusters/k8s-homelab`) |
 | App-of-apps | [`../clusters/k8s-homelab/`](../clusters/k8s-homelab) — `infrastructure.yaml` + `flux-instance.yaml` + `apps.yaml` |
-| Kustomizations | `flux-system`, `infrastructure`, `flux-instance`, `apps` — all `Ready=True` |
+| Kustomizations | `flux-system`, `infrastructure`, `flux-instance`, `image-automation`, `apps` — all `Ready=True` |
 | SOPS decryption | `spec.decryption` (`provider: sops`, `secretRef: sops-age`) on `infrastructure` + `apps` |
 
 > The original `flux bootstrap` manifests (`clusters/k8s-homelab/flux-system/`)

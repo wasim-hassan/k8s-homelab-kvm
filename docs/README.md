@@ -59,7 +59,6 @@ image automation** and supply-chain artifacts (trivy + SBOM + provenance). See t
 | [`../config/k9s/`](../config/k9s) | k9s config, hotkeys, gruvbox skin (mounted via `K9S_CONFIG_DIR`) |
 | [`../clusters/`](../clusters) | Flux app-of-apps (`clusters/k8s-homelab/`) |
 | [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring, Flux Operator, Trivy Operator) |
-| [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring, Flux Operator, Trivy Operator) |
 | [`../apps/`](../apps) | workloads (podinfo, ratlab-demo) with encrypted secrets |
 | [`../images/`](../images) | app source built by CI (`ratlab-demo`) |
 | [`../.github/`](../.github/workflows/ci.yaml) | GitHub Actions CI (build → GHCR, trivy, SBOM, provenance) |
