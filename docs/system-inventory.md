@@ -516,7 +516,7 @@ Verified 2026-10-15, reconciled at `main@sha1:5f6b164`.
 | Item | Value |
 |---|---|
 | Namespace | `podinfo` |
-| Image | `ghcr.io/stefanprodan/podinfo:6.7.1` |
+| Image | `ghcr.io/stefanprodan/podinfo:6.15.0` |
 | Resources | requests `cpu 10m / mem 32Mi`; limits `cpu 200m / mem 64Mi` |
 | Service | ClusterIP `80` → container `9898` |
 | Routing | HTTPRoute `podinfo` host `podinfo.local` → Gateway `eg`; ReferenceGrant `allow-podinfo-to-gateway` |

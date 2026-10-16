@@ -20,5 +20,5 @@ KSV-0021
 # KSV-0125 — Image from an untrusted registry.
 # ghcr.io is GitHub's container registry (FOSS, trusted by this project); the
 # check's default trusted list is Docker Hub-centric. The image is
-# ghcr.io/stefanprodan/podinfo, pinned to 6.7.1.
+# ghcr.io/stefanprodan/podinfo, pinned to 6.15.0.
 KSV-0125
