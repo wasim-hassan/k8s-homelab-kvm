@@ -17,14 +17,14 @@
 - Permissions: `contents: read`, `packages: write`, `id-token: write`, `attestations: write`, `security-events: write`.
 - Steps: `actions/checkout@v4` → `docker/setup-buildx-action@v3` → `docker/login-action@v3` (GHCR, `GITHUB_TOKEN`) → `docker/metadata-action@v5` (tags `{{version}}`, `{{major}}.{{minor}}`, branch, `sha`, `latest`) → `docker/build-push-action@v6` (push; `provenance: false`, `sbom: false`, gha cache) → trivy → SARIF upload → SBOM → provenance attestation.
 - Supply chain:
-  - Trivy image scan: `aquasecurity/trivy-action@0.36.0`, `severity: CRITICAL,HIGH`, `ignore-unfixed: true`, SARIF output. Auth via `TRIVY_USERNAME=github.actor` / `TRIVY_PASSWORD=GITHUB_TOKEN` (works while the package is still private).
+  - Trivy image scan: `aquasecurity/trivy-action@v0.36.0` (note the **`v`** prefix — the action publishes tags as `vX.Y.Z`; referencing `0.36.0` makes the job fail during *Set up job*), `severity: CRITICAL,HIGH`, `ignore-unfixed: true`, SARIF output. Auth via `TRIVY_USERNAME=github.actor` / `TRIVY_PASSWORD=GITHUB_TOKEN` (works while the package is still private).
   - SARIF → `github/codeql-action/upload-sarif@v3` (`continue-on-error: true` — GHAS is not on private repos) **and** kept as the `trivy-sarif` artifact.
   - SBOM: `anchore/sbom-action@v0` (syft, `spdx-json`), artifact `ratlab-demo-sbom`.
-  - Provenance: `actions/attest-build-provenance@v4` (`subject-name` + digest, `push-to-registry: true`).
+  - Provenance: `actions/attest-build-provenance@v4` (`subject-name` + digest, `push-to-registry: true`). **Not available for user-owned private repos**, so the step is gated on `github.event.repository.private == false` (skipped, not failed, while private; runs automatically once public).
 - `imagetools inspect ghcr.io/wasim-hassan/ratlab-demo:<tag>` (or `docker buildx imagetools`) shows the attestation manifest.
 
 ## 03. One-time credential setup (manual)
-1. **Write deploy key.** Generate the keypair + SOPS secret (see §03a), then in GitHub → *Repo → Settings → Deploy keys → Add deploy key*, paste the **public** key printed by the script and **✅ Allow write access**.
+1. **Write deploy key.** Generate the keypair + SOPS secret (see §03a), then in GitHub → *Repo → Settings → Deploy keys → Add deploy key*, paste the **public** key printed by the script and **✅ Allow write access**. With the `gh` CLI this is one command: `gh repo deploy-key add <pub-file> -R wasim-hassan/k8s-homelab-kvm --title flux-image-automation --allow-write`.
    - Public key (for reference):
      `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILFF6guelbTRKHkx7x9PJuTQf81Kz4IpWnFWaKL4iLer flux-image-automation@ratlab`
 - (a) Regenerate/rotate the key at any time:
@@ -37,7 +37,7 @@
   sops --encrypt --in-place clusters/k8s-homelab/image-automation/git-write-secret.sops.yaml
   cat "$KEYDIR/id_ed25519.pub"
   ```
-- **Package visibility:** after the first successful CI push, set the GHCR package `ratlab-demo` to **public** (Package settings → Change visibility). This lets the `ImageRepository` scan it and lets kubelet pull the image without a registry secret. (Alternative: keep it private and add a `dockerconfigjson` pull secret + `ImageRepository.spec.secretRef` — not used here.)
+- **Package visibility:** after the first successful CI push, set the GHCR package `ratlab-demo` to **public** (`https://github.com/users/<user>/packages/container/ratlab-demo/settings` → *Danger Zone → Change visibility → Public*). This lets the `ImageRepository` scan it and lets kubelet pull the image without a registry secret. **UI-only:** GHCR has **no REST/CLI endpoint** to change package visibility (a `PATCH` returns 404), so this can't be automated. (Alternative: keep it private and add a `dockerconfigjson` pull secret + `ImageRepository.spec.secretRef` — not used here.)
 
 ## 03b. Flux image-automation manifests
 - Path: [`clusters/k8s-homelab/image-automation/`](../../clusters/k8s-homelab/image-automation) — `kustomization.yaml`, `git-repository.yaml`, `image-repository.yaml`, `image-policy.yaml`, `image-update-automation.yaml`, `git-write-secret.sops.yaml`.
@@ -85,4 +85,6 @@ kubectl -n ratlab-demo rollout status deploy/ratlab-demo --timeout=90s
 - **`Setters`** is the only `update.strategy` value in v1.
 - **GHCR package must be public** for the `ImageRepository` scrape and kubelet pull; otherwise ImagePolicy never resolves and the pod stays `ImagePullBackOff`.
 - SARIF upload to code scanning is best-effort (`continue-on-error`) because private repos need GitHub Advanced Security; the SARIF is retained as a workflow artifact.
+- **Action ref casing matters:** `aquasecurity/trivy-action` publishes tags as `vX.Y.Z`, so the ref must be `@v0.36.0`. A bare `@0.36.0` fails to resolve and aborts the job during *Set up job* (≈8 s) — before any build runs, so nothing is pushed.
+- Provenance attestation is **skipped** (not failed) on user-owned private repos; it starts working automatically when the repo is public.
 - The build embeds the version via `-ldflags -X main.version`; `/version` is the quick way to confirm a rollout actually changed the running image.

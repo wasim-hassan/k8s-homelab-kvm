@@ -1089,3 +1089,41 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   kubectl -n ratlab-demo rollout status deploy/ratlab-demo --timeout=90s
   ```
 - **Lesson:** The reverse is also useful to know — until those steps are completed, `ImagePullBackOff` + `DENIED` are the **expected** state, not a manifest bug. Keep the two manual prerequisites in the runbook so a fresh setup doesn't chase a phantom.
+
+## 2026-10-16 — CI job dies in ~8 s: `Unable to resolve action aquasecurity/trivy-action@0.36.0`
+
+- **Context:** Every Phase 8 GitHub Actions run failed within 6–8 s — the `v0.1.0` tag push, the `main` pushes, and even the run with the "SARIF non-fatal" fix. So **no image was ever pushed to GHCR**, which in turn made the package "not found" and the `ImageRepository` scan return `DENIED`.
+- **Symptom:** the job shows no executed steps; the only error is:
+  ```text
+  ##[error]Unable to resolve action `aquasecurity/trivy-action@0.36.0`, unable to find version `0.36.0`
+  ```
+- **Root cause:** the action's **git tags are `vX.Y.Z`** (e.g. `v0.36.0`), not `X.Y.Z`. GitHub resolves `uses:` refs against **tags/branches/SHAs**, so `0.36.0` matches nothing and the whole job is aborted during *Set up job* (before any step runs). It's easy to miss because the action's *release* page can imply `0.36.0`.
+- **Fix:** pin the `v`-prefixed tag: `uses: aquasecurity/trivy-action@v0.36.0`. Verify any `uses:` ref against the repo's tags before trusting an example:
+  ```bash
+  gh api repos/aquasecurity/trivy-action/tags --jq '.[].name' | head
+  gh api repos/<owner>/<action>/git/ref/tags/<ref> --jq .ref   # 404 = won't resolve
+  ```
+- **Lesson:** A ~seconds-long failure with **no steps executed** is an *action-resolution* problem, not a build problem. Read the *Set up job* log first.
+
+## 2026-10-16 — CI green through build/push, then fails: provenance attestation "not available for user-owned private repositories"
+
+- **Context:** After fixing the trivy ref, the build and push **succeeded** (image `0.1.1`/`0.1`/`latest` reached GHCR), but the job still went red on the final step.
+- **Symptom:**
+  ```text
+  ##[error]Error: Failed to persist attestation: Feature not available for user-owned private repositories. To enable this feature, please make this repository public.
+  ```
+- **Root cause:** `actions/attest-build-provenance` (Sigstore keyless attestations) is **not supported for user-owned private repos**. It only works once the repo is public.
+- **Fix:** gate the step so it skips on private repos and activates automatically when public:
+  ```yaml
+  if: github.event_name != 'pull_request' && github.event.repository.private == false
+  ```
+- **Note (not a bug):** the equivalent limitation applies to the SARIF upload (`continue-on-error`) — GHAS/code-scanning needs a public repo or an Advanced Security licence.
+- **Lesson:** distinguish a **failing step** from a **red workflow that still produced its artifact**. Here the image was pushed before the attestation step, so the pipeline was already useful — but the job must be green to be trustworthy.
+
+## 2026-10-16 — GHCR package visibility cannot be changed via API (UI-only)
+
+- **Context:** Automating the "make the package public" step for Phase 8.
+- **Symptom:** `gh api -X PATCH /user/packages/container/ratlab-demo -f visibility=public` → `404 Not Found`.
+- **Root cause:** GitHub's REST API for Packages supports **get / delete / restore / list versions** but has **no endpoint to change a package's visibility**. It is a long-standing gap (confirmed by GitHub docs and community reports).
+- **Fix:** change it once in the web UI: `https://github.com/users/<user>/packages/container/<image>/settings` → *Danger Zone → Change visibility → Public*. (Or keep the package private and wire a `dockerconfigjson` pull secret into both the `ImageRepository` and the workload.)
+- **Lesson:** some GHCR settings are UI-only. When automating, plan for a small, documented manual step; don't assume everything under a resource has a REST endpoint.

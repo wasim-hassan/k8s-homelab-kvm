@@ -490,7 +490,7 @@ Added 2026-10-16. See [ADR-0009](adr/0009-ci-cd-image-automation.md) and
 | App built | `ratlab-demo` — Go HTTP server, `scratch` image, `USER 65532:65532` ([`images/ratlab-demo/`](../images/ratlab-demo)) |
 | Registry | `ghcr.io/wasim-hassan/ratlab-demo` (GHCR) |
 | CI | GitHub Actions [`.github/workflows/ci.yaml`](../.github/workflows/ci.yaml) — buildx build/push; tags from `docker/metadata-action` (`{{version}}`, `{{major}}.{{minor}}`, branch, `sha`, `latest`) |
-| Supply chain | trivy image scan (`aquasecurity/trivy-action@0.36.0`, SARIF, severity CRITICAL/HIGH, ignore-unfixed) · SBOM (`anchore/sbom-action@v0` / syft, SPDX-JSON) · provenance (`actions/attest-build-provenance@v4`, pushed to registry) |
+| Supply chain | trivy image scan (`aquasecurity/trivy-action@v0.36.0`, SARIF, severity CRITICAL/HIGH, ignore-unfixed) · SBOM (`anchore/sbom-action@v0` / syft, SPDX-JSON) · provenance (`actions/attest-build-provenance@v4`, pushed to registry; **skipped on private repo** — requires a public repo) |
 | Flux components added | `image-reflector-controller`, `image-automation-controller` (via `FluxInstance.spec.components`) |
 | `ImageRepository` | `flux-system/ratlab-demo` → `ghcr.io/wasim-hassan/ratlab-demo`, 5m |
 | `ImagePolicy` | `flux-system/ratlab-demo` — semver `>=0.1.0` |

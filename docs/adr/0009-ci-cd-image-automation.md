@@ -34,13 +34,16 @@ automation** write new tags back to git.
   git tags, `sha`, `edge`/`latest`. Pushes use the run's `GITHUB_TOKEN`
   (`packages: write`) — no long-lived registry credential.
 - **Supply chain (left of Phase 7):**
-  - `trivy` image scan (`aquasecurity/trivy-action@0.36.0`, `severity:
+  - `trivy` image scan (`aquasecurity/trivy-action@v0.36.0`, `severity:
     CRITICAL,HIGH`, `ignore-unfixed: true`) → SARIF, plus a retained artifact.
     Code-scanning upload is `continue-on-error` (GHAS is not enabled on a private
     repo; the SARIF artifact is the durable record).
   - **SBOM** via `anchore/sbom-action` (syft, SPDX-JSON) uploaded as an artifact.
   - **Build provenance** attestation via `actions/attest-build-provenance@v4`
-    (Sigstore keyless, pushed to the registry).
+    (Sigstore keyless, pushed to the registry). Provenance is **not available
+    for user-owned private repositories**, so the step is gated on
+    `github.event.repository.private == false` and activates automatically once
+    the repo is made public.
 - GitHub Actions was chosen over a self-hosted FOSS runner (Gitea
   Actions/Woodpecker) as the roadmap-sanctioned, zero-extra-infrastructure option
   for a 2-node lab. GitHub is a hosted service here, not a component in the
@@ -86,11 +89,12 @@ automation** write new tags back to git.
   (accepted; not in-cluster). Image automation **pushes to `main`**, so branch
   protection must allow the deploy-key identity, and a `vX.Y.Z` tag is required to
   cut a release (documented in the runbook).
-- **Neutral / manual steps:** Two one-time GitHub actions are required (not
-  automatable from here): (a) add the generated **public** key as a **write**
-  deploy key, and (b) set the **GHCR package visibility to public** so the
-  ImageRepository and kubelet can pull without a registry secret. Until (b),
-  `ratlab-demo` shows `ImagePullBackOff`.
+- **Neutral / manual steps:** (a) the generated **public** key is added as a
+  **write** deploy key (done via `gh`); (b) the **GHCR package visibility** must
+  be set to **public** so the ImageRepository and kubelet can pull without a
+  registry secret. Step (b) is **UI-only**: GHCR has **no REST/CLI endpoint to
+  change package visibility**. Until (b), `ratlab-demo` stays `ImagePullBackOff`
+  and the ImageRepository scan returns `DENIED`.
 
 ## References
 - [runbook 09](../runbooks/09-ci-cd-image-automation.md) (execution + verification)
