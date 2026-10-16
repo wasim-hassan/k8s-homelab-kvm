@@ -227,6 +227,10 @@ scanning — and provide the requested "trivy web UI" without adding a bespoke a
 - **Bonus fix:** the `flux-system` PSS `enforce`/`audit` labels, previously set
   imperatively and reverted after a restart, are now **declarative** via
   `FluxInstance.spec.commonMetadata.labels`.
+- **Findings triage:** `podinfo` upgraded `6.7.1 → 6.15.0` (its report → 0
+  Critical/High; cluster-wide **Critical 6 → 0**, total **897 → 701**). Remaining
+  upstream/system findings are reviewed and **accepted** (not chased to zero) —
+  see [ADR-0008](adr/0008-trivy-operator.md#findings-triage-accepted-risk).
 
 ---
 

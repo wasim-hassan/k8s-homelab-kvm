@@ -94,6 +94,31 @@ the **existing Grafana** — no new UI component is introduced.
   (`podSecurityContext` is top-level, `scanJobPodTemplate*` is under
   `trivyOperator:`) — documented in the runbook.
 
+## Findings triage (accepted risk)
+
+A scanner reports **findings**, not breaches. On a 2-node LAN-only homelab the
+operator surfaced 897 vulnerabilities / 140 misconfigs on first scan. We adopt an
+explicit triage policy instead of chasing a zero count:
+
+- **Remediate what we own and can fix cheaply.** The one actionable hotspot was
+  the demo workload `podinfo` pinned to an old image (`6.7.1`: **6 Critical + 36
+  High**). Bumped to `6.15.0` → **0 Critical, 0 High, 0 Medium, 0 Low** for that
+  image (commit `71c3d02`). Cluster-wide Criticals went **6 → 0**.
+- **Accept upstream/system-image findings.** The bulk of the count lives in
+  base/OS packages of images we do not build (k3s `coredns`/`metrics-server`,
+  Flux controllers, `kube-state-metrics`, `klipper-helm`). These are remediated by
+  keeping the platform current (k3s/Flux/kube-prometheus-stack upgrades), not by
+  per-CVE action. Most are `Unknown` severity (scanner could not assign a rating).
+- **RBAC (73 cluster-role + 11 role) and config-audit (140)** findings are
+  predominantly on required system objects (`cluster-admin`, `system:*`,
+  monitoring/kube-system components). Reviewed and **accepted**; the only
+  workload we own (`podinfo`) is already `restricted`-compliant.
+- **Exposed Secrets = 0** maintained.
+
+Accepted findings are re-reviewed when the platform is upgraded, not chased
+individually. The dashboard (`Number and Type of Security Issues`) is read by
+**severity** (Critical/High first), not by the raw total.
+
 ## References
 - [runbook 08](../runbooks/08-security-hardening.md) (execution + verification)
 - [system-inventory — Security](../system-inventory.md#security-phase-7)

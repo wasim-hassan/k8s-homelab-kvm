@@ -467,6 +467,14 @@ scanning; results rendered in Grafana (the "web UI"). See
 | Dashboard | Grafana **17813** "Trivy Operator Dashboard" as a `ConfigMap` (`grafana_dashboard=1`) in `infrastructure/monitoring/dashboards/` |
 | Manifests | [`../infrastructure/trivy-operator/`](../infrastructure/trivy-operator), [`../infrastructure/monitoring/dashboards/`](../infrastructure/monitoring/dashboards) |
 
+**Findings triage (accepted).** Trivy findings are **not** driven to zero. The one
+workload we own, `podinfo`, was remediated by upgrading `6.7.1 → 6.15.0`
+(report `critical=0 high=0 medium=0 low=0`, was 6/36/16/7) — which took
+cluster-wide **Critical 6 → 0**, total **897 → 701**. The remaining findings are
+on upstream/system images (coredns, flux controllers, klipper-helm,
+kube-state-metrics, …) and required system RBAC objects; they are remediated by
+platform upgrades and otherwise **accepted** (see [ADR-0008](adr/0008-trivy-operator.md#findings-triage-accepted-risk)).
+
 ---
 
 ## GitOps state (Phase 3 — Flux CD, now operator-managed)
