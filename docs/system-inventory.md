@@ -499,16 +499,18 @@ Added 2026-10-16. See [ADR-0009](adr/0009-ci-cd-image-automation.md) and
 | Setter marker | `apps/ratlab-demo/deployment.yaml`: `# {"$imagepolicy": "flux-system:ratlab-demo"}` |
 | Workload | `ratlab-demo` ns (PSS `restricted`) — Deployment/Service/HTTPRoute, routed at `ratlab-demo.local` |
 | Tag convention | release-driven: only `vX.Y.Z` tags match the `ImagePolicy` (main pushes produce unmatched `sha`/`latest`) |
-| Manual prerequisites | (1) write deploy key added on GitHub; (2) GHCR package `ratlab-demo` set **public** |
+| Manual prerequisites | ✅ done — (1) write deploy key `flux-image-automation` added (read-write); (2) GHCR package `ratlab-demo` set **public** |
 
-**Verified this session:** image ref+automation controllers `1/1 Running`; CRDs
-`imagerepositories/imagepolicies/imageupdateautomations` present; `image-automation`
-Kustomization `Ready`; the write `GitRepository`, `ImageRepository`, `ImagePolicy`,
-`ImageUpdateAutomation` objects created. **Pending (manual, GitHub-side):** adding
-the write deploy key (`flux-git-write` source currently `Ready=False: unable to
-authenticate`) and making the GHCR package public (`ImageRepository` currently
-`DENIED: requested access to the resource is denied`) — until then `ratlab-demo`
-is `ImagePullBackOff`.
+**Verified end-to-end (2026-10-16).** image ref+automation controllers
+`1/1 Running`; CRDs `imagerepositories/imagepolicies/imageupdateautomations`
+present. Both one-time GitHub steps are done: the **write deploy key** is added
+(`GitRepository/flux-git-write` `Ready=True`) and the **GHCR package is public**
+(`ImageRepository` `Ready`, scan finds 6 tags). `ImagePolicy` resolved **`0.1.1`**,
+`ImageUpdateAutomation` committed **`ec32534 chore(image-automation): update
+ratlab-demo image`** to `main`, and the `apps` Kustomization rolled the new tag
+out — `ratlab-demo` pod is **`1/1 Running`** on `ghcr.io/wasim-hassan/ratlab-demo:0.1.1`.
+`curl -H 'Host: ratlab-demo.local' http://192.168.123.11/version` returns
+`{"version":"0.1.1",...}`. CI runs are green (`v0.1.1` + `main`).
 
 ---
 

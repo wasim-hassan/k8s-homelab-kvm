@@ -89,12 +89,14 @@ automation** write new tags back to git.
   (accepted; not in-cluster). Image automation **pushes to `main`**, so branch
   protection must allow the deploy-key identity, and a `vX.Y.Z` tag is required to
   cut a release (documented in the runbook).
-- **Neutral / manual steps:** (a) the generated **public** key is added as a
-  **write** deploy key (done via `gh`); (b) the **GHCR package visibility** must
-  be set to **public** so the ImageRepository and kubelet can pull without a
-  registry secret. Step (b) is **UI-only**: GHCR has **no REST/CLI endpoint to
-  change package visibility**. Until (b), `ratlab-demo` stays `ImagePullBackOff`
-  and the ImageRepository scan returns `DENIED`.
+- **Neutral / manual steps (both done):** (a) the generated **public** key is
+  added as a **write** deploy key (done via `gh` as `flux-image-automation`);
+  (b) the **GHCR package visibility** must be set to **public** so the
+  ImageRepository and kubelet can pull without a registry secret. Step (b) is
+  **UI-only**: GHCR has **no REST/CLI endpoint to change package visibility**,
+  so it cannot be automated. Until (b), `ratlab-demo` stays `ImagePullBackOff`
+  and the ImageRepository scan returns `DENIED` (this was the observed state
+  before the manual step).
 
 ## References
 - [runbook 09](../runbooks/09-ci-cd-image-automation.md) (execution + verification)

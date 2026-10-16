@@ -331,10 +331,11 @@ To pick this up in a new session:
 10. **Phase 8 done** (2026-10-16): CI/CD via **GitHub Actions → GHCR** (trivy +
     SBOM + provenance) and **Flux image automation** (image-reflector +
     image-automation controllers, `ImageRepository`/`ImagePolicy`/
-  `ImageUpdateAutomation`, SOPS write key) driving the `ratlab-demo` workload.
-   **Two one-time GitHub steps remain:** add the write deploy key and set the
-   GHCR package public. See [ADR-0009](adr/0009-ci-cd-image-automation.md),
-   [runbook 09](runbooks/09-ci-cd-image-automation.md).
+    `ImageUpdateAutomation`, SOPS write key) driving the `ratlab-demo` workload.
+    Verified end-to-end: `ImagePolicy` → `0.1.1`, Flux committed the tag bump
+    (`ec32534`), `ratlab-demo` is `Running`. See
+    [ADR-0009](adr/0009-ci-cd-image-automation.md),
+    [runbook 09](runbooks/09-ci-cd-image-automation.md).
 
 ---
 
