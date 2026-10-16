@@ -17,13 +17,15 @@ implementation. Two things are already true in this cluster:
 2. **The Gateway API v1 CRDs are installed, but with no controller.** A
    `helm-install-gateway-api-crd` Job exists in `kube-system`, and the cluster has
    the standard CRDs:
-   ```
+
+   ```text
    gatewayclasses.gateway.networking.k8s.io      (v1)
    gateways.gateway.networking.k8s.io            (v1)
    httproutes.gateway.networking.k8s.io          (v1)
    grpcroutes / tcproutes / tlsroutes / udproutes
    referencegrants / backendtlspolicies / listenersets
    ```
+
    Verified with `kubectl get crd | grep -i gateway`. At decision time there was
    **no GatewayClass** and no controller Deployment, so the CRDs were inert.
    > **Superseded 2026-10-15:** the controller is now installed — see
@@ -71,11 +73,13 @@ coupling to the skipped Cilium migration).
 ## Consequences
 
 **Positive**
+
 - First workload can be exposed through whichever controller Phase 3 picks,
   managed entirely by Flux (HelmRelease).
 - No premature vendor/tech lock-in for ingress.
 
 **Negative — accepted risks**
+
 - **Idle CRDs.** The Gateway API CRDs sit unused until a controller is installed;
   a `Gateway` object would stay `Pending` with no `GatewayClass`.
 - **Extra provisioning step.** Phase 3 must install + configure a controller

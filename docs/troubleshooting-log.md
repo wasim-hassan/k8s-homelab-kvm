@@ -14,6 +14,7 @@ Format: symptom → root cause → fix → how to verify → lesson.
 services masked.
 
 **Investigation:**
+
 ```bash
 systemctl is-active virtqemud virtlogd virtnetworkd   # all inactive
 ls -l /etc/systemd/system/virtqemud.service
@@ -29,6 +30,7 @@ daemon refused to start even though the package was correctly installed.
 restarts the `default` network.
 
 **Verify:**
+
 ```bash
 virsh version      # libvirt 12.0.0 / QEMU 12.0.0
 virsh net-list --all
@@ -43,12 +45,15 @@ package reinstalls, which makes it look like a broken install when it isn't.
 ## 2026-10-02 — "A dependency job for virtqemud.service failed"
 
 **Symptom:** During `kvm on`:
-```
+
+```text
 A dependency job for virtqemud.service failed. See 'journalctl -xe' for details.
 ```
+
 …followed immediately by `Started virtqemud.service`.
 
 **Investigation:**
+
 ```bash
 journalctl -u virtqemud.service --no-pager -n 25
 ```
@@ -66,6 +71,7 @@ transparently.
 **Fix:** None needed.
 
 **Verify:**
+
 ```bash
 virsh version      # succeeds, proving socket activation works
 systemctl is-active virtqemud
@@ -80,7 +86,8 @@ not just the first line — the recovery is usually a few seconds later. And an
 ## 2026-10-02 — VM creation aborted: `Network not found: 'K8s'`
 
 **Symptom:**
-```
+
+```text
 ERROR    Network not found: no network with matching name 'K8s'
 Domain installation does not appear to have been successful.
 ```
@@ -101,6 +108,7 @@ virsh net-list --name
 defining the domain, so no half-built VM was created. Only two unused files
 remained (a 597 MB qcow2 and a 370 KB seed ISO), both overwritten on retry.
 Confirmed no stub domain was left behind:
+
 ```bash
 virsh dominfo k8s-worker-01     # error: failed to get domain
 virsh list --all --name         # only k8s-cp-01
@@ -115,7 +123,8 @@ than typing. `virsh net-list --name` is the authority on valid names.
 ## 2026-10-02 — `virsh net-define` refused to update the `k8s` network
 
 **Symptom:**
-```
+
+```text
 error: Failed to define network from .../libvirt-k8s-net.xml
 error: operation failed: network 'k8s' already exists with uuid
        a547ca9d-acb1-486a-9ae3-e5cf44d2b88b
@@ -127,6 +136,7 @@ already taken.
 
 **Fix:** Add the network's existing UUID to the XML. A matching UUID signals
 "update this network" rather than "create a new one":
+
 ```bash
 virsh net-uuid k8s   # a547ca9d-acb1-486a-9ae3-e5cf44d2b88b
 ```
@@ -151,6 +161,7 @@ VMs rebooted — and they still came back on **random** IPs (`.201`, `.164`)
 instead of the reserved `.11` / `.12`.
 
 **Investigation:**
+
 ```bash
 virsh net-dumpxml --inactive k8s | grep host
 # <host name='k8s-cp-01' ip='192.168.123.11'/>     <-- macaddr GONE
@@ -172,6 +183,7 @@ The reservations existed but with **no MAC address**.
    `virsh net-dumpxml --inactive k8s`.
 
 **Proof (isolated reproduction on a throwaway network):**
+
 ```bash
 # with macaddr=  -> stripped, no error
 # with mac=      -> preserved
@@ -181,6 +193,7 @@ The reservations existed but with **no MAC address**.
 **Fix:** Use `mac=` in `terraform/libvirt-k8s-net.xml`.
 
 **Verify:**
+
 ```bash
 virsh net-dumpxml k8s | grep "<host"
 # <host mac='52:54:00:17:ef:cf' name='k8s-cp-01' ip='192.168.123.11'/>
@@ -211,7 +224,8 @@ Three habits that would have caught this on attempt one:
 ## 2026-10-02 — Unexpected 596 MB cloud image re-download
 
 **Symptom:** VM creation took 6m26s instead of ~1m15s:
-```
+
+```text
 ⚠️  Cached image is outdated or invalid — re-downloading...
 ```
 
@@ -237,6 +251,7 @@ correctly.
 immediately disables and **masks** the libvirt daemons.
 
 **Investigation:**
+
 ```bash
 grep -nE "shutdown|destroy|sleep 5|mask" ~/Sync/Repos/kvm-vm-provisioner/scripts/kvm-toggle.sh
 #  32: virsh shutdown "$vm" || virsh destroy "$vm" || true
@@ -255,6 +270,7 @@ check` afterwards with "No errors were found". The daemon logged `Deactivated
 successfully`, i.e. it waited for QEMU to exit rather than cutting it off.
 
 **Correct approach (and required once k3s/etcd is installed):**
+
 ```bash
 virsh shutdown k8s-cp-01 k8s-worker-01
 # wait until BOTH show "shut off" — do not use a fixed sleep
@@ -271,7 +287,8 @@ Shut down gracefully and wait for the actual state transition, not a timer.
 
 **Symptom:** Module and sysctl files were never created, yet `modprobe`
 "appeared" to run. Output showed:
-```
+
+```text
 bash: line 1: overlay: command not found
 bash: line 2: br_netfilter: command not found
 ✗ could not write /etc/modules-load.d/k8s.conf
@@ -291,6 +308,7 @@ bash: line 2: br_netfilter: command not found
    returned exit 0 and looked successful.
 
 **Fix:**
+
 - Added `write_remote_file()` which base64-encodes content and passes it as a
   **positional argument**, so stdin stays free for the script and no content is
   ever re-interpreted by the shell.
@@ -298,6 +316,7 @@ bash: line 2: br_netfilter: command not found
   `ssh_root_node`.
 
 **Verify:**
+
 ```bash
 ssh k8s-cp-01 'cat /etc/modules-load.d/k8s.conf'      # overlay, br_netfilter, nf_conntrack
 ssh k8s-cp-01 'lsmod | grep br_netfilter'             # loaded
@@ -335,13 +354,16 @@ invoked inside a `while read < <(...)` loop must be given `-n` (or explicit
 
 **Symptom:** `20-install-k3s-server.sh` produced no output for 10+ minutes and
 was killed by timeout. On the node:
-```
+
+```text
 curl -o /tmp/k3s-install.*/k3s.bin -sfL \
   https://github.com/k3s-io/k3s/releases/download/v1.37.1%2Bk3s1/k3s
 ```
+
 …stalled at **0 bytes**.
 
 **Investigation:**
+
 ```bash
 # partial file size, sampled twice
 0 bytes … 0 bytes          # no progress
@@ -369,6 +391,7 @@ k3s_binary_push()     # scp to the node, install -m 0755 /usr/local/bin/k3s
 ```
 
 **Verify:**
+
 ```bash
 sha256sum ~/.cache/k3s-homelab/k3s-v1.37.1+k3s1
 # 92b94582eb7b34a8cf532e6006842b9ed215a6783cf56a3dd6271fd35243b2c0  (matches release)
@@ -392,6 +415,7 @@ whole install faster and reproducible.
 metrics-server, and local-path-provisioner as `0/1 ContainerCreating`.
 
 **Investigation:**
+
 ```bash
 kubectl describe pod -n kube-system -l k8s-app=kube-dns | sed -n '/Events:/,$p'
 # Pulled … in 1m19.238s (including waiting). Image size: 24261571 bytes.
@@ -413,17 +437,20 @@ scheduler, CNI, or RBAC problem. On a slow link, budget a couple of minutes.
 ## 2026-10-12 — Containerfile build died at the SSH-config step
 
 **Symptom:** `devpod up . --ide none` built fine up to step 16, then:
-```
+
+```text
 /bin/sh: 1: Syntax error: end of file unexpected (expecting "}")
 Error: building at STEP "RUN mkdir -p /home/dev/.ssh /home/dev/.cache && chmod 700 /home/dev/.ssh && { echo 'Host k8s-cp-01 …';"
 ```
 
 **Root cause:** A `RUN` in the `Containerfile` was written as a shell brace group:
-```
+
+```text
 RUN … && { echo 'Host …';
       echo '    User ratlab';
       echo … ; } > /home/dev/.ssh/config
 ```
+
 Every physical line of a `RUN` must end with `\` to continue. The lines inside
 `{ … }` did **not**, so the instruction was terminated at the first newline and
 `/bin/sh` received an unterminated `{`.
@@ -432,6 +459,7 @@ Every physical line of a `RUN` must end with `\` to continue. The lines inside
 `printf '%s\n' 'line1' 'line2' … > file`, with each physical line ending in `\`.
 
 **Verify:**
+
 ```bash
 devpod up . --ide none          # steps proceed past 16
 devpod ssh k8s-homelab-kvm --command 'cat /home/dev/.ssh/config'
@@ -446,17 +474,21 @@ single-line-ish (`printf '%s\n'`) over multi-line brace groups.
 ## 2026-10-12 — Helm build step: `sha256sum: <tarball>: No such file or directory`
 
 **Symptom:** The Containerfile helm step failed with:
-```
+
+```text
 sha256sum: helm-v4.3.0-linux-amd64.tar.gz: No such file or directory
 ```
+
 even though the download step used `&&` and would have failed loudly had the
 `curl` failed.
 
 **Investigation:** Reproduced the download+verify **on the host** in
 `/tmp/opencode/helmtest` — it worked perfectly:
-```
+
+```text
 86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb  helm-v4.3.0-linux-amd64.tar.gz
 ```
+
 The in-container cause was not conclusively pinned down.
 
 **Fix:** Rewrote the step to be **filename-independent**: download to fixed
@@ -466,6 +498,7 @@ compare `expected="$(awk '{print $1}' /tmp/helm.sha256sum)"` against
 line printed `expected=… actual=…` (identical) and the step passed.
 
 **Verify:**
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'helm version --short'   # v4.3.0+gbec5b06
 ```
@@ -481,22 +514,26 @@ diagnosis trivial.
 ## 2026-10-12 — Workspace could not read the mounted kubeconfig / SSH key
 
 **Symptom:** `postCreateCommand` passed, but inside the container:
-```
+
+```text
 kubectl … error loading config file "/root/.kube/config": permission denied
 ssh … no such identity: /root/.ssh/k8s-homelab-kvm: Permission denied
 ls: cannot open directory '/workspaces/k8s-homelab-kvm': Permission denied
 ```
+
 First attempt ran as `root`; the same failures persisted after switching to
 the uid-1000 `dev` user. `Chown workspace…` logged `open
 /workspaces/k8s-homelab-kvm: permission denied`.
 
 **Investigation:**
+
 ```bash
 podman inspect -f '{{json .HostConfig.IDMappings}}' <ctr>
 # {"UidMap":["0:1:1000","1000:0:1","1001:1001:64536"], ...}
 getenforce            # Enforcing
 ls -Zd ~/.kube        # unconfined_u:object_r:user_home_t:s0
 ```
+
 Two independent blockers:
 
 1. **Rootless Podman uid mapping.** The default map does **not** place the host
@@ -519,6 +556,7 @@ user (`containerUser`/`remoteUser`). Mount targets moved from `/root/…` to
 `/home/dev/…`.
 
 **Verify:**
+
 ```bash
 devpod ssh k8s-homelab-kvm --command \
   'id; kubectl get nodes; ssh k8s-cp-01 "sudo -n k3s --version"'
@@ -543,6 +581,7 @@ no-vendor-lock requirement.
 **Root cause:** Inherited defaults from the reference setup, not a defect.
 
 **Fix:** Drop-in replacements, then recreate:
+
 - base `mcr.microsoft.com/devcontainers/base:ubuntu-24.04` → `quay.io/fedora/fedora:44`
 - user `vscode` → `dev` (uid/gid 1000; `keep-id` needs uid 1000)
 - `Dockerfile` → `Containerfile`; `devcontainer.json` `"dockerfile": "Containerfile"`
@@ -557,10 +596,12 @@ no-vendor-lock requirement.
 > apps.
 
 **Verify:**
+
 ```bash
 devpod up . --ide none --recreate
 devpod ssh k8s-homelab-kvm --command 'cat /etc/fedora-release | head -1; id'
 ```
+
 → `Fedora Linux 44 (Container Image)`, `uid=1000(dev)`, all tools present, both
 nodes `Ready`.
 
@@ -576,27 +617,32 @@ ours to choose.
 
 **Symptom:** `k9s` returned instantly over `devpod ssh` (kitty). A PTY test
 surfaced:
-```
+
+```text
 Error: could not create any of the following paths: [/home/dev/.config/k9s /etc/xdg/k9s]
 ```
 
 **Investigation:** Two independent causes:
+
 ```bash
 echo $TERM                 # xterm-kitty
 infocmp xterm-kitty        # failed — no terminfo entry → tcell aborts
 ls -ld /home/dev/.config   # drwxr-xr-x root root  (not writable by dev)
 ```
+
 `/home/dev/.config` was created **root-owned** because Podman materializes the
 parent directory of the `~/.config/nvim` bind mount. Separately, the Fedora base
 has no `script(1)`, so the automated PTY test used Python instead:
 `python3 -c 'import pty; pty.spawn(["k9s"])'` under `timeout`.
 
 **Fix:**
+
 - install `kitty-terminfo` in the `Containerfile`
 - pre-create `/home/dev/.config` (dev-owned) in the image *before* the nvim mount
 - `devpod up . --ide none --recreate`
 
 **Verify:**
+
 ```bash
 devpod ssh k8s-homelab-kvm --command \
   'TERM=xterm-kitty timeout 5 python3 -c "import pty; pty.spawn([\"k9s\"])"; echo exit=$?'
@@ -617,7 +663,8 @@ test TUI programs under a PTY — a plain `--command` has no TTY.
 **Symptom:** The morning after a full host shutdown, `podman ps -a` showed the
 workspace container as `Exited (0)`, and `podman ps` (running only) returned
 nothing. It looked like the workspace had failed to come back:
-```
+
+```text
 CONTAINER ID  IMAGE                              STATUS                 NAMES
 620bed9fb762  localhost/vsc-k8s-homelab-kvm...   Exited (0) 21 hours ago  charming_lalande
 ```
@@ -662,6 +709,7 @@ that version. The key was written in the wrong place/schema, so decoding failed.
 with **zero warnings**.
 
 **Verify:**
+
 ```bash
 k9s info                      # no config warnings; reads Config/Hotkeys/Skins
 kubectl -n kube-system get pods   # TUI still lands on all-namespace pods
@@ -827,6 +875,7 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   `upstream connect error or disconnect/reset before headers (reset reason:
   remote connection failure)` and scattered "error loading" messages.
 - **Investigation:**
+
   ```bash
   kubectl -n monitoring describe pod -l app.kubernetes.io/name=grafana
   # Last State: Terminated, Reason: OOMKilled, Exit Code: 137
@@ -835,6 +884,7 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   kubectl -n monitoring logs -l app.kubernetes.io/name=grafana -c grafana | grep bleve
   # logger=bleve-backend ... resource=dashboards reason=getStats "Building index using memory"
   ```
+
 - **Root cause:** Grafana 13 builds an **in-memory search index** (bleve) over
   all provisioned dashboards. Loading the dashboard list spiked memory past the
   `256Mi` limit → the container was OOMKilled (exit 137) → Envoy had no healthy
@@ -846,11 +896,13 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   (`64Mi`/`128Mi`). Commit `9550bb4` — values in
   `infrastructure/monitoring/helmrelease.yaml`.
 - **Verify:**
+
   ```bash
   kubectl -n monitoring top pod -l app.kubernetes.io/name=grafana --containers
   # grafana ~317Mi (< 512Mi), restartCount 0
   curl -s -H 'Host: grafana.local' http://192.168.123.11/api/health   # {"database":"ok",...}
   ```
+
 - **Lesson:** On a small cluster it is tempting to set memory limits very low;
   Grafana 13 is not as light as older versions (its new dashboard search indexes
   in memory). `kubectl top pod` without `--containers` reports the **pod total**,
@@ -879,12 +931,14 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   dashboards on these flags, so this removed 4 ServiceMonitors (12→8) and 4
   dashboards (28→24).
 - **Verify:**
+
   ```bash
   kubectl -n monitoring get servicemonitors            # 8, none etcd/scheduler/cm/proxy
   kubectl -n monitoring get cm -l grafana_dashboard=1  # 24
   curl -s -u admin:<pw> -H 'Host: grafana.local' \
     'http://192.168.123.11/api/search?type=dash-db'    # no etcd/scheduler/cm/proxy
   ```
+
 - **Lesson:** Match a monitoring stack to what the distribution actually runs.
   k3s is not upstream Kubernetes — control-plane components are internal, so
   their stock dashboards are dead weight. Turning off the components keeps the
@@ -895,19 +949,23 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
 - **Symptom:** After committing the Flux Operator (OCIRepository + HelmRelease)
   **and** a `FluxInstance` in the same directory, the `infrastructure`
   Kustomization went `Ready=False`:
-  ```
+
+  ```text
   FluxInstance/flux-system/flux dry-run failed: no matches for kind "FluxInstance"
   in version "fluxcd.controlplane.io/v1"
   ```
+
   The OCIRepository and HelmRelease were **never created** — the operator never
   installed, so the Web UI never came up.
 - **Investigation:**
+
   ```bash
   devpod ssh k8s-homelab-kvm --command 'flux get kustomizations -A'
   # infrastructure: FluxInstance/flux-system/flux dry-run failed: no matches for kind "FluxInstance" ...
   devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get ocirepository,helmrelease'
   # NotFound  ← nothing applied, not even the operator HelmRelease
   ```
+
 - **Root cause:** `kustomize-controller` performs a **server-side dry run of the
   entire resource set before applying any of it**. The `FluxInstance` CRD is
   installed by the Flux Operator (which the HelmRelease installs), so at apply
@@ -919,11 +977,13 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   so the operator (and its CRDs) exist before the FluxInstance is applied.
   Commits `0b94a97` (split) + `4271ca6` (retire old bootstrap).
 - **Verify:**
+
   ```bash
   devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get fluxinstance'
   # flux   True   Reconciliation finished ...   v2.9.6@sha256:...
   devpod ssh k8s-homelab-kvm --command 'flux get kustomizations -A'   # all Ready
   ```
+
 - **Lesson:** A Flux Kustomization applies **atomically at dry-run**: one
   un-creatable resource (a CR whose CRD is installed by another resource in the
   same batch) blocks **everything**. Install CRD-providing controllers in one
@@ -938,6 +998,7 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   still listed all those objects, so removing them looked like it would **prune
   the Flux CRDs → cascade-delete every Flux CR**.
 - **Investigation:**
+
   ```bash
   devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get kustomization flux-system \
     -o jsonpath="{.status.inventory.entries[*].id}"'
@@ -946,6 +1007,7 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
     -o jsonpath="{.metadata.annotations}"'
   # kustomize.toolkit.fluxcd.io/prune: Disabled ; kustomize.toolkit.fluxcd.io/ssa: Ignore
   ```
+
 - **Root cause / resolution:** Once the operator adopts Flux, it annotates
   **every** object it manages with `kustomize.toolkit.fluxcd.io/prune: Disabled`
   (and `ssa: Ignore`). kustomize-controller **skips pruning** any object carrying
@@ -964,18 +1026,21 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
 - **Context:** Phase 7 hardening set `runAsNonRoot: true` on the podinfo pod and
   `enforce: restricted` on the `podinfo` namespace. The new pod failed to start.
 - **Symptom:**
-  ```
+
+  ```text
   kubectl -n podinfo get pods
   # podinfo-7d6c6f698f-... 0/1 CreateContainerConfigError
   kubectl -n podinfo describe pod ...
   # Error: container has runAsNonRoot and image has non-numeric user (app),
   #        cannot verify user is non-root
   ```
+
 - **Root cause:** podinfo's image declares `USER app` (a *name*, not a *number*;
   at runtime it is `uid=100(app) gid=101(app)`). With `runAsNonRoot: true` and no
   explicit `runAsUser`, the kubelet cannot prove the user is non-root and refuses
   to start the container.
 - **Fix:** pin a numeric user/group in the pod `securityContext`:
+
   ```yaml
   securityContext:
     runAsNonRoot: true
@@ -984,6 +1049,7 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
     fsGroup: 101
     seccompProfile: { type: RuntimeDefault }
   ```
+
   Then `flux reconcile kustomization apps --with-source` →
   `kubectl -n podinfo rollout status deploy/podinfo` → *successfully rolled out*.
 - **Lesson:** `runAsNonRoot: true` + an image with a **named** (non-numeric) user
@@ -997,6 +1063,7 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
 
 - **Context:** Deploying the Trivy Operator (Phase 7b, [ADR-0008](adr/0008-trivy-operator.md)) into `trivy-system`, which is PSS `restricted`. The `HelmRelease` went `Ready=True`, but **no scan jobs were created**.
 - **Symptom:**
+
   ```bash
   kubectl -n trivy-system get events --sort-by=.lastTimestamp | tail
   # ... Error creating: pods "scan-vulnerabilityreport-..." is forbidden:
@@ -1006,42 +1073,51 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   kubectl -n trivy-system get pods
   # operator 1/1 Running  (scan jobs: none)
   ```
+
 - **Root cause:** The Helm values were nested under the wrong keys. `podSecurityContext` / `securityContext` are **top-level** chart values, and the scan-job pods take theirs from `trivyOperator.scanJobPodTemplatePodSecurityContext` / `trivyOperator.scanJobPodTemplateContainerSecurityContext`. The initial values put the security contexts under `operator:`, which the chart ignored — so the operator pod and the scan-job template stayed unhardened. A dry render exposed it: `helm template trivy-operator aqua/trivy-operator` showed no `securityContext`.
 - **Fix:** Move the security contexts to the correct keys (top-level for the operator pod; under `trivyOperator:` for the scan-job template — numeric non-root uid 10000, `RuntimeDefault`, `drop: [ALL]`, `readOnlyRootFilesystem: true`). Commits `bc02584` (initial, wrong nesting) → `a81ad26` (fix).
 - **Verify:**
+
   ```bash
   kubectl -n trivy-system get pods                     # operator 1/1; scan jobs Running then Completed
   kubectl get vulnerabilityreports,configauditreports -A
   kubectl -n trivy-system get pod <scan-job> -o jsonpath="{.spec.containers[0].securityContext}"
   ```
+
 - **Lesson:** A chart can be `Ready=True` (Helm applied fine) while the *workloads* it creates are blocked by Pod Security — a `HelmRelease` success is **not** proof the pods ran. Always `helm template` and inspect the rendered securityContexts before applying, and remember scan/child pods often take their security contexts from a **separate** chart key. Also note: PSS is enforced at pod **admission**, so the `FailedCreate` events persist against the **old** ReplicaSet even after the fix — check the *current* pods, not old events.
 
 ## 2026-10-16 — `flux-system` PSS `enforce`/`audit` labels reverted after a restart (operator-owned namespace)
 
 - **Context:** Phase 7 set `pod-security.kubernetes.io/{enforce,audit}=restricted` on `flux-system` **imperatively** (`kubectl label`) and recorded it as an accepted exception ([ADR-0007](adr/0007-security-hardening.md)), because the namespace is Flux-Operator–owned. After a VM restart, `enforce`/`audit` were gone again.
 - **Symptom:**
+
   ```bash
   kubectl get ns flux-system -o jsonpath="{.metadata.labels}" | tr ',' '\n' | grep pod-security
   # only pod-security.kubernetes.io/warn (+ warn-version) survived
   ```
+
 - **Root cause:** The `flux-system` namespace is reconciled by the **Flux Operator** (`app.kubernetes.io/managed-by: flux-operator`, annotation `kustomize.toolkit.fluxcd.io/ssa: Ignore`). Imperative changes are **not** in the operator's desired state, so its reconcile reverts them. Only the operator's own label (`warn`) survived.
 - **Fix:** Set the six PSS labels **declaratively** via `FluxInstance.spec.commonMetadata.labels` ([`clusters/k8s-homelab/flux-instance/fluxinstance.yaml`](../clusters/k8s-homelab/flux-instance/fluxinstance.yaml)); the operator re-applies them on every reconcile.
 - **Verify:**
+
   ```bash
   kubectl get ns flux-system -o jsonpath="{.metadata.labels.pod-security\.kubernetes\.io/enforce}"   # restricted
   kubectl -n flux-system get fluxinstance flux -o jsonpath="{.status.conditions[?(@.type=='Ready')].reason}"
   ```
+
 - **Lesson:** For an operator-owned object, **never** manage a field imperatively — the operator will revert it. Put the desired state where the **operator** reads it (here, `FluxInstance.spec.commonMetadata`). "It stuck" after a manual `kubectl label` only means the operator had not reconciled yet.
 
 ## 2026-10-16 — `flux-instance` Kustomization briefly `Ready=False` after a reconcile (`dependency 'flux-system/infrastructure' revision is not up to date`)
 
 - **Context:** After pushing a source (docs-only) change and reconciling, `flux get kustomizations -A` showed `flux-instance` `Ready=False` while `infrastructure` was already `Ready` at the **new** revision.
 - **Symptom:**
+
   ```bash
   flux get kustomizations -A
   # flux-system  flux-instance  refs/heads/main@sha1:71c3d02...  False
   #   dependency 'flux-system/infrastructure' revision is not up to date
   ```
+
 - **Root cause:** `flux-instance` declares `dependsOn: infrastructure`. The `dependsOn` check is **revision-based**: on a new source revision each Kustomization reconciles independently, and `flux-instance` can be evaluated *after* the source updates but *before* `infrastructure` has re-applied the same revision. The message is a transient ordering artifact, not a drift or a config error.
 - **Fix:** Nudge the dependent so it re-evaluates: `flux reconcile kustomization flux-instance -n flux-system`. It then sees `infrastructure` at the matching revision and goes Ready.
 - **Lesson:** A `dependency ... revision is not up to date` message that clears on its own (or after a nudge) is **not** a bug — don't "fix" the manifests for it. Only investigate if a Kustomization stays stuck at a **stale** revision while its dependency sits at a newer one.
@@ -1050,10 +1126,12 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
 
 - **Context:** Phase 8 added the Flux image-automation CRs. The `image-automation` Kustomization went `Ready=False` on a **dry-run** validation error and applied nothing (so no `ImageRepository`/`ImagePolicy`/secret appeared).
 - **Symptom:** two successive schema errors while iterating on one file:
+
   ```text
   .spec.git.push.secretRef: field not declared in schema
   spec.update.strategy: Unsupported value: "Settle": supported values: "Setters"
   ```
+
 - **Root cause:** the **v1** API changed from the older `v1beta2` examples:
   1. `ImageUpdateAutomation` **no longer has `spec.git.push.secretRef`** — push credentials are taken from the **`sourceRef` GitRepository's** own `secretRef`. There is no separate push secret anymore.
   2. `spec.update.strategy` accepts only **`Setters`** (the value `Settle` is invalid/removed).
@@ -1061,21 +1139,25 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   - Drop `spec.git.push.secretRef`; instead create a **dedicated write `GitRepository`** (`flux-git-write`) that references the write deploy key, and set `ImageUpdateAutomation.spec.sourceRef` to it. This also avoids repointing the operator-managed read `flux-system` source (which would break git access before the write key is authorized).
   - Set `spec.update.strategy: Setters`.
 - **Verify:**
+
   ```bash
   flux get kustomization image-automation -n flux-system   # Ready=True
   kubectl -n flux-system get imagerepository,imagepolicy,imageupdateautomation
   ```
+
 - **Lesson:** Flux API docs/examples are often still `v1beta2`. Confirm the field against the **installed CRD** before trusting a manifest: `kubectl get crd <plural>.image.toolkit.fluxcd.io -o json | jq '.spec.versions[].schema'`. Kustomize-controller dry-runs the whole bundle, so one bad field blocks the entire Kustomization.
 
 ## 2026-10-16 — `ratlab-demo` is `ImagePullBackOff` until two GitHub-side steps are done (expected, not a bug)
 
 - **Context:** First deploy of the Phase 8 workload. The Pod sits in `ImagePullBackOff`, the `ImageRepository` shows `DENIED`, and `GitRepository/flux-git-write` shows an SSH auth failure.
 - **Symptom:**
+
   ```text
   imagerepository ratlab-demo: scan failed: ...ghcr.io/token...: DENIED: requested access to the resource is denied
   gitrepository flux-git-write: ssh: handshake failed: ssh: unable to authenticate ...
   pod ratlab-demo-...: ImagePullBackOff
   ```
+
 - **Root cause:** two one-time, account-scoped actions cannot be automated from the cluster/workspace:
   1. the **write deploy key** (public half) has not been added to the GitHub repo → Flux can't push tags back / authenticate the write `GitRepository`;
   2. the **GHCR package is private** by default → the ImageRepository scan and the kubelet pull are denied.
@@ -1083,40 +1165,50 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   1. Repo → Settings → **Deploy keys** → add the `flux-image-automation@ratlab` public key with **Allow write access**.
   2. Package `ratlab-demo` → **Package settings → Change visibility → Public**.
 - **Verify:**
+
   ```bash
   kubectl -n flux-system get gitrepository flux-git-write   # READY True
   kubectl -n flux-system get imagerepository ratlab-demo    # READY True
   kubectl -n ratlab-demo rollout status deploy/ratlab-demo --timeout=90s
   ```
+
 - **Lesson:** The reverse is also useful to know — until those steps are completed, `ImagePullBackOff` + `DENIED` are the **expected** state, not a manifest bug. Keep the two manual prerequisites in the runbook so a fresh setup doesn't chase a phantom.
 
 ## 2026-10-16 — CI job dies in ~8 s: `Unable to resolve action aquasecurity/trivy-action@0.36.0`
 
 - **Context:** Every Phase 8 GitHub Actions run failed within 6–8 s — the `v0.1.0` tag push, the `main` pushes, and even the run with the "SARIF non-fatal" fix. So **no image was ever pushed to GHCR**, which in turn made the package "not found" and the `ImageRepository` scan return `DENIED`.
 - **Symptom:** the job shows no executed steps; the only error is:
+
   ```text
   ##[error]Unable to resolve action `aquasecurity/trivy-action@0.36.0`, unable to find version `0.36.0`
   ```
+
 - **Root cause:** the action's **git tags are `vX.Y.Z`** (e.g. `v0.36.0`), not `X.Y.Z`. GitHub resolves `uses:` refs against **tags/branches/SHAs**, so `0.36.0` matches nothing and the whole job is aborted during *Set up job* (before any step runs). It's easy to miss because the action's *release* page can imply `0.36.0`.
 - **Fix:** pin the `v`-prefixed tag: `uses: aquasecurity/trivy-action@v0.36.0`. Verify any `uses:` ref against the repo's tags before trusting an example:
+
   ```bash
   gh api repos/aquasecurity/trivy-action/tags --jq '.[].name' | head
   gh api repos/<owner>/<action>/git/ref/tags/<ref> --jq .ref   # 404 = won't resolve
   ```
+
 - **Lesson:** A ~seconds-long failure with **no steps executed** is an *action-resolution* problem, not a build problem. Read the *Set up job* log first.
 
 ## 2026-10-16 — CI green through build/push, then fails: provenance attestation "not available for user-owned private repositories"
 
 - **Context:** After fixing the trivy ref, the build and push **succeeded** (image `0.1.1`/`0.1`/`latest` reached GHCR), but the job still went red on the final step.
 - **Symptom:**
+
   ```text
   ##[error]Error: Failed to persist attestation: Feature not available for user-owned private repositories. To enable this feature, please make this repository public.
   ```
+
 - **Root cause:** `actions/attest-build-provenance` (Sigstore keyless attestations) is **not supported for user-owned private repos**. It only works once the repo is public.
 - **Fix:** gate the step so it skips on private repos and activates automatically when public:
+
   ```yaml
   if: github.event_name != 'pull_request' && github.event.repository.private == false
   ```
+
 - **Note (not a bug):** the equivalent limitation applies to the SARIF upload (`continue-on-error`) — GHAS/code-scanning needs a public repo or an Advanced Security licence.
 - **Lesson:** distinguish a **failing step** from a **red workflow that still produced its artifact**. Here the image was pushed before the attestation step, so the pipeline was already useful — but the job must be green to be trustworthy.
 

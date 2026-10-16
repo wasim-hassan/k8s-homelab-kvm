@@ -1,72 +1,73 @@
-# k8s-homelab-kvm — Documentation Index
+# Documentation
 
-A 2-node k3s homelab on libvirt/KVM, with the operator toolchain in a FOSS-only
-Devpod (Podman) workspace. This index links every document.
+Everything about the homelab lives here. If you want the current state of the
+system, read the [system inventory](system-inventory.md). If you want to bring it
+up, start with [runbook 03](runbooks/03-session-lifecycle.md).
 
-Current phase: **all planned phases (0–8) complete** — k3s, workspace, k9s, GitOps
-with Flux/SOPS, the observability stack, security hardening, the **Flux Web UI**
-(Flux migrated to the Flux Operator), the **Trivy Operator** (continuous scanning +
-Grafana dashboard), and **Phase 8** — CI/CD via GitHub Actions → GHCR with **Flux
-image automation** and supply-chain artifacts (trivy + SBOM + provenance). See the
-[roadmap](roadmap.md) for the forward plan (now stretch items) and decisions.
+All planned phases (0 through 8) are complete: k3s, the operator workspace, k9s,
+GitOps with Flux and SOPS, observability, security hardening, the Trivy Operator,
+the Flux Web UI, and the CI/CD pipeline with image automation. The
+[roadmap](roadmap.md) tracks what is deferred.
 
----
+## Runbooks
 
-## Runbooks (do-this, in order)
+Step-by-step procedures, meant to be followed in order.
 
-| # | Runbook | Covers |
+| # | Runbook | What it covers |
 |---|---|---|
-| 01 | [Install k3s](runbooks/01-install-k3s.md) | node prep, control plane, worker join, verify |
-| 02 | [Operator workspace](runbooks/02-devpod-workspace.md) | Podman + Devpod, FOSS base, mounts, runArgs |
-| 03 | [Session lifecycle](runbooks/03-session-lifecycle.md) | start/stop order (`kvm on` → VMs → `devpod up`) |
-| 04 | [k9s single pane](runbooks/04-k9s-single-pane.md) | observe/inspect the cluster (k9s, gruvbox, hotkeys) |
-| 05 | [GitOps with Flux CD](runbooks/05-gitops-flux.md) | Flux bootstrap, SOPS/age, Envoy Gateway, podinfo workload |
-| 06 | [Observability](runbooks/06-observability.md) | kube-prometheus-stack via Flux, Grafana route, Prometheus targets |
-| 07 | [Flux Web UI](runbooks/07-flux-webui.md) | migrate Flux to the Flux Operator, Flux Status UI at `flux.local` |
-| 08 | [Security hardening](runbooks/08-security-hardening.md) | trivy, PSS, RBAC, secrets hygiene + Trivy Operator (Phase 7b) |
-| 09 | [CI/CD + image automation](runbooks/09-ci-cd-image-automation.md) | GitHub Actions → GHCR, trivy + SBOM + provenance, Flux image automation |
+| 01 | [Install k3s](runbooks/01-install-k3s.md) | Provision the nodes and form the cluster |
+| 02 | [Devpod workspace](runbooks/02-devpod-workspace.md) | The FOSS-only operator environment on Podman |
+| 03 | [Session lifecycle](runbooks/03-session-lifecycle.md) | Host → VM → workspace start and stop order |
+| 04 | [k9s](runbooks/04-k9s-single-pane.md) | Terminal UI for the cluster, gruvbox theme and hotkeys |
+| 05 | [GitOps with Flux CD](runbooks/05-gitops-flux.md) | Bootstrap, SOPS/age, Envoy Gateway, first workload |
+| 06 | [Observability](runbooks/06-observability.md) | kube-prometheus-stack via Flux, Grafana route |
+| 07 | [Flux Web UI](runbooks/07-flux-webui.md) | Move Flux to the Flux Operator, Status UI at `flux.local` |
+| 08 | [Security hardening](runbooks/08-security-hardening.md) | Trivy, PSS, RBAC, secrets hygiene, Trivy Operator |
+| 09 | [CI/CD and image automation](runbooks/09-ci-cd-image-automation.md) | GitHub Actions → GHCR, then Flux updates the tag |
 
-## ADRs (why)
+## Architecture decision records
+
+One short record per non-trivial decision.
 
 | # | Decision |
 |---|---|
 | 0001 | [TLP over `tuned`](adr/0001-tlp-over-tuned.md) |
 | 0002 | [Implicit CPU model via `--osinfo`](adr/0002-implicit-cpu-model.md) |
 | 0003 | [Operator environment in a Devpod workspace](adr/0003-devpod-workspace.md) |
-| 0004 | [Ingress / Gateway API strategy](adr/0004-gateway-api-and-ingress.md) *(accepted — Envoy Gateway)* |
-| 0005 | [No Ansible — node config stays scripted](adr/0005-no-ansible-node-config.md) *(accepted)* |
-| 0006 | [Flux managed by the Flux Operator (Web UI)](adr/0006-flux-operator-managed.md) *(accepted)* |
-| 0007 | [Security hardening (trivy, PSS, RBAC)](adr/0007-security-hardening.md) *(accepted)* |
-| 0008 | [Continuous scanning — Trivy Operator + Grafana](adr/0008-trivy-operator.md) *(accepted)* |
-| 0009 | [CI/CD + Flux image automation](adr/0009-ci-cd-image-automation.md) *(accepted)* |
+| 0004 | [Ingress and Gateway API strategy](adr/0004-gateway-api-and-ingress.md) |
+| 0005 | [No Ansible: node config stays scripted](adr/0005-no-ansible-node-config.md) |
+| 0006 | [Flux managed by the Flux Operator](adr/0006-flux-operator-managed.md) |
+| 0007 | [Security hardening](adr/0007-security-hardening.md) |
+| 0008 | [Continuous scanning with the Trivy Operator](adr/0008-trivy-operator.md) |
+| 0009 | [CI/CD and Flux image automation](adr/0009-ci-cd-image-automation.md) |
 
 ## Reference
 
-| Doc | What |
+| Doc | What it holds |
 |---|---|
-| [System inventory](system-inventory.md) | verified host + cluster + workspace state |
-| [Roadmap](roadmap.md) | phase plan (all done; stretch remains) + decision log |
-| [Troubleshooting log](troubleshooting-log.md) | every real failure: symptom → cause → fix → lesson |
+| [System inventory](system-inventory.md) | The verified state of the host, cluster, and workspace |
+| [Roadmap](roadmap.md) | Phase plan, decision log, and deferred work |
+| [Troubleshooting log](troubleshooting-log.md) | Every real failure: symptom, cause, fix, lesson |
 
-## Code / config
+## Code and configuration
 
-| Path | What |
+| Path | What it is |
 |---|---|
-| [`../scripts/`](../scripts) | phase scripts (`preflight`, `10-`, `20-`, `30-`, `40-`) |
-| [`../inventory/nodes.yml`](../inventory/nodes.yml) | node addresses, roles, resources |
-| [`../terraform/`](../terraform) | libvirt `k8s` network XML (Terraform deferred — [ADR-0005](adr/0005-no-ansible-node-config.md)) |
-| [`../ansible/`](../ansible) | dropped — node config stays scripted ([ADR-0005](adr/0005-no-ansible-node-config.md)) |
-| [`../config/k9s/`](../config/k9s) | k9s config, hotkeys, gruvbox skin (mounted via `K9S_CONFIG_DIR`) |
-| [`../clusters/`](../clusters) | Flux app-of-apps (`clusters/k8s-homelab/`) |
-| [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring, Flux Operator, Trivy Operator) |
-| [`../apps/`](../apps) | workloads (podinfo, ratlab-demo) with encrypted secrets |
-| [`../images/`](../images) | app source built by CI (`ratlab-demo`) |
-| [`../.github/`](../.github/workflows/ci.yaml) | GitHub Actions CI (build → GHCR, trivy, SBOM, provenance) |
-| [`../.devcontainer/`](../.devcontainer) | `Containerfile` + `devcontainer.json` |
+| [`../scripts/`](../scripts) | Preflight and provisioning scripts (`preflight`, `10-`, `20-`, `30-`, `40-`) |
+| [`../inventory/nodes.yml`](../inventory/nodes.yml) | Node addresses, roles, resources |
+| [`../terraform/`](../terraform) | libvirt network XML (Terraform itself is deferred, see ADR-0005) |
+| [`../config/k9s/`](../config/k9s) | k9s config, hotkeys, gruvbox skin |
+| [`../clusters/`](../clusters) | Flux app-of-apps entrypoint |
+| [`../infrastructure/`](../infrastructure) | Cluster controllers as Git-managed manifests |
+| [`../apps/`](../apps) | Workloads and their encrypted secrets |
+| [`../images/`](../images) | Application source built by CI |
+| [`../.devcontainer/`](../.devcontainer) | The workspace `Containerfile` and `devcontainer.json` |
+| [`../.github/workflows/`](../.github/workflows) | CI (build and scan) and lint workflows |
 
-## Reading order (newcomer)
+## Reading order
 
-1. [System inventory](system-inventory.md) — what exists right now
-2. [Runbook 03](runbooks/03-session-lifecycle.md) — how to turn it on
-3. [Runbook 01](runbooks/01-install-k3s.md) → [Runbook 02](runbooks/02-devpod-workspace.md)
-4. [ADRs](adr) for the reasoning behind each choice
+1. [System inventory](system-inventory.md) to see what exists right now.
+2. [Runbook 03](runbooks/03-session-lifecycle.md) to bring it up.
+3. [Runbook 01](runbooks/01-install-k3s.md) and
+   [runbook 02](runbooks/02-devpod-workspace.md) to understand how it was built.
+4. The [ADRs](adr) for the reasoning behind each choice.

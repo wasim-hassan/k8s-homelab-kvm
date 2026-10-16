@@ -56,16 +56,19 @@ host-config layer rather than adding a tool for it.
 ## Consequences
 
 **Positive**
+
 - One fewer tool; one less thing to learn, run, and keep in sync.
 - That layer is already proven (`10-prepare-nodes.sh`), so nothing regresses.
 - Clear path forward: **Talos** removes this layer permanently when adopted.
 
 **Negative**
+
 - No Ansible exposure in this project. (Ansible remains a marketable skill and
   can be learned separately; it is easy to add back if the environment ever
   becomes a mutable-OS on-prem fleet.)
 
 **Neutral**
+
 - `ansible/` stays empty (and untracked — nothing to remove from git).
 - `terraform/` keeps only `libvirt-k8s-net.xml` for reference.
 

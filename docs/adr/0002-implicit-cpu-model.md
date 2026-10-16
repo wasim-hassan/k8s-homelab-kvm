@@ -17,9 +17,11 @@ for two reasons:
 
 1. **Talos Linux** (considered for a later phase) refuses to boot below
    x86-64-v2, halting at:
-   ```
+
+   ```text
    [talos] [initramfs] microarchitecture level 2 or higher is required, halting
    ```
+
 2. **Lost crypto acceleration.** containerd, etcd, kube-apiserver, and
    FluxCD are TLS-heavy. Without hardware AES-NI the host burns CPU on software
    AES for every connection.
@@ -39,7 +41,8 @@ Tested across every OS type the provisioner supports — `ubuntu24.04`,
 `--osinfo` omitted entirely, emits **no** `<cpu>` element at all.
 
 Live confirmation on a created node:
-```
+
+```text
 $ virsh dumpxml k8s-cp-01 | grep '<cpu'
   <cpu mode='host-passthrough' check='none' migratable='on'/>
 ```
@@ -73,11 +76,13 @@ behaviour is **implicit and therefore fragile**.
 ## Consequences
 
 **Positive**
+
 - Zero changes to external tooling.
 - VMs get the host's real instruction set, including hardware AES-NI.
 - Talos remains viable for a future phase.
 
 **Negative — accepted risk**
+
 - **Hidden dependency.** The correct CPU model exists only as a side effect of
   `--osinfo ubuntu24.04`. If that flag is ever removed from `vm-creator.sh`, VMs
   silently regress to `qemu64` and lose AES-NI, AVX2, and BMI2. This will not

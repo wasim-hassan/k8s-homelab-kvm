@@ -20,6 +20,7 @@ Deploy the **Trivy Operator** (Aqua), managed by Flux, and surface its results i
 the **existing Grafana** — no new UI component is introduced.
 
 ### 1. Trivy Operator via Flux `HelmRelease`
+
 - Chart **`trivy-operator` 0.37.0** (app **v0.35.0**) from the `aqua`
   `HelmRepository` (`https://aquasecurity.github.io/helm-charts`), delivered as a
   `HelmRelease` in the new **`trivy-system`** namespace
@@ -32,6 +33,7 @@ the **existing Grafana** — no new UI component is introduced.
   simpler for a 2-node lab.
 
 ### 2. "Web UI" = Grafana, not a bespoke app
+
 - The operator exposes **Prometheus metrics** (`trivy_image_vulnerabilities`,
   `trivy_resource_configaudits`, …). Prometheus already scrapes the cluster, so
   the UI is a **Grafana dashboard**.
@@ -49,6 +51,7 @@ the **existing Grafana** — no new UI component is introduced.
   watches cluster-wide).
 
 ### 3. Security posture kept consistent with Phase 7
+
 - **PSS `restricted`** on `trivy-system` (enforce/warn/audit). The operator image
   runs as **uid 10000** (non-root) and both the operator pod and the scan-job pods
   are given numeric non-root `runAsUser`/`runAsGroup`, `RuntimeDefault` seccomp,
@@ -67,6 +70,7 @@ the **existing Grafana** — no new UI component is introduced.
   dashboard has data.
 
 ### 4. `flux-system` PSS labels moved to declarative management
+
 - Phase 7 set the `flux-system` PSS labels **imperatively** and recorded that as
   an exception ([ADR-0007](0007-security-hardening.md)), because the namespace is
   Flux-Operator–owned. In practice the `enforce`/`audit` labels **reverted after
@@ -120,6 +124,7 @@ individually. The dashboard (`Number and Type of Security Issues`) is read by
 **severity** (Critical/High first), not by the raw total.
 
 ## References
+
 - [runbook 08](../runbooks/08-security-hardening.md) (execution + verification)
 - [system-inventory — Security](../system-inventory.md#security-phase-7)
 - [ADR-0007 — Phase 7 security hardening](0007-security-hardening.md)

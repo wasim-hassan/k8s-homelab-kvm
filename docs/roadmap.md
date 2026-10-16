@@ -1,27 +1,20 @@
-# Roadmap — k8s-homelab-kvm
+# Roadmap: k8s-homelab-kvm
 
-Forward plan for the homelab, phase by phase, with the decision points that
-block each phase. This is also the **resume point** for a new session: read the
+Forward plan for the homelab, phase by phase, with the decision points that block
+each phase. This is also the resume point for a new session: read the
 [Resume checklist](#resume-checklist) at the bottom.
 
 - **Last updated:** 2026-10-16
-- **Done so far:** Phases 0–3 (substrate, k3s cluster, operator workspace + k9s,
-  GitOps: Flux CD + SOPS/age, Envoy Gateway, first workload), Phase 5 (scripts),
-  Phase 6 (observability), Phase 7 (security hardening), Phase 7b (Trivy Operator
-  + Grafana dashboard), Phase 8 (CI/CD + Flux image automation) — see
-  [system-inventory.md](system-inventory.md#current-phase-status).
 - **Last verified:** 2026-10-16
-- **Done so far (verified):** substrate (KVM/libvirt/VMs), k3s cluster,
-  Devpod workspace, k9s, GitOps (Flux + SOPS/age + Envoy Gateway + podinfo),
-  the observability stack (kube-prometheus-stack), the **Flux Web UI**
-  (Flux migrated to the **Flux Operator**, [ADR-0006](adr/0006-flux-operator-managed.md)),
-  **Phase 7 security hardening** (trivy, PSS, RBAC, secrets hygiene,
-  [ADR-0007](adr/0007-security-hardening.md)), and **Phase 7b** — the
-  **Trivy Operator** for continuous in-cluster scanning with a Grafana dashboard
-  ([ADR-0008](adr/0008-trivy-operator.md)), and **Phase 8** — CI/CD via GitHub
-  Actions → GHCR with **Flux image automation** ([ADR-0009](adr/0009-ci-cd-image-automation.md)).
-- **Current focus:** maintenance + the deferred/stretch items (Talos, storage,
-  backup). All planned phases 0–8 are done.
+- **Status:** all planned phases (0 through 8) are complete. The current focus is
+  maintenance and the deferred, stretch items (Talos, storage, backup).
+- **Built:** the substrate (KVM/libvirt, VMs), the k3s cluster, the operator
+  workspace and k9s, GitOps (Flux CD, SOPS/age, Envoy Gateway, the `podinfo`
+  workload), the provisioning scripts, observability (`kube-prometheus-stack`),
+  security hardening, the Trivy Operator with its Grafana dashboard, the Flux Web
+  UI (Flux moved to the Flux Operator), and the CI/CD pipeline with Flux image
+  automation. See
+  [system-inventory.md](system-inventory.md#current-phase-status).
 - **Phase timeline:** Phase 3 (GitOps) done 2026-10-14; Phase 5 (IaC) re-scoped
   2026-10-15 ([ADR-0005](adr/0005-no-ansible-node-config.md)); Phase 6
   (Observability) **done** 2026-10-15; Flux moved to operator-managed + Web UI
@@ -32,7 +25,8 @@ block each phase. This is also the **resume point** for a new session: read the
   ([ADR-0009](adr/0009-ci-cd-image-automation.md)).
 - **Remaining:** the deferred/stretch items (Talos, storage, backup).
 
-### Status — all planned phases complete
+## Status — all planned phases complete
+
 Phases 0–8 are **done**. The phase sections below are the closed record; the
 forward plan is now the [stretch items](#stretch-later).
 
@@ -89,6 +83,7 @@ least-risky order.
 first real workload.
 
 **Deliverables**
+
 1. **Flux CD** bootstrapped (v2.9.6, read-only deploy key) against the private
    GitHub remote; app-of-apps under `clusters/k8s-homelab/`. ✅
 2. **Secrets** with **SOPS + age** — age key generated, `sops-age` Secret in
@@ -102,6 +97,7 @@ first real workload.
    encrypted Secret decrypted in-cluster. ✅
 
 **Files added**
+
 - `clusters/k8s-homelab/flux-system/` — Flux bootstrap output. *(Removed 2026-10-15
   when Flux moved to operator-managed — [ADR-0006](adr/0006-flux-operator-managed.md).)*
 - `clusters/k8s-homelab/{kustomization,infrastructure,apps}.yaml` — app-of-apps.
@@ -288,6 +284,7 @@ The option tables for decisions 1–3 are preserved in git history; the
 resolutions above supersede them.
 
 ### Resolved — Decision 4 — Observability sizing
+
 Resolved 2026-10-15: bump the VM RAM (`k8s-cp-01` 3 GiB, `k8s-worker-01`
 1536 MiB) and run a trimmed `kube-prometheus-stack` (Alertmanager off,
 Prometheus `6h` retention / 2Gi `local-path` PVC). Both nodes stay below 65%

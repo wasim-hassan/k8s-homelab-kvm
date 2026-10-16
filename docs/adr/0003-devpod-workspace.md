@@ -76,12 +76,14 @@ Podman is rootless, daemonless, and already the operator's runtime. Devpod's
 ## Consequences
 
 **Positive**
+
 - One command rebuilds the entire operator environment anywhere.
 - Tool versions are pinned and (mostly) checksum-verified as code.
 - Host cleanup: `kubectl`/`helm` removed from `~/.local/bin`.
 - Fully FOSS stack: Fedora + Podman + Devpod + Neovim; vendor-neutral naming.
 
 **Negative — accepted risks**
+
 - **Devpod is an extra dependency.** Not in dnf/apt; installed manually and
   **without an upstream checksum** (upstream publishes none). Local SHA256 is
   recorded in the inventory.

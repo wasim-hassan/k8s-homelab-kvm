@@ -29,6 +29,7 @@ target; saves memory).
 ## Execution order
 
 ### 1. Trim the chart for the small cluster (Decision 4)
+
 - Chose `kube-prometheus-stack` chart **92.7.0** (app v0.94.1) and trimmed values
   inline in the HelmRelease:
   - `alertmanager.enabled: false`
@@ -47,6 +48,7 @@ target; saves memory).
   - `grafana.fullnameOverride: grafana` (stable Service name for the route)
 
 ### 2. Manifests (all under `infrastructure/monitoring/`)
+
 - `namespace.yaml` — `monitoring`
 - `helmrepository.yaml` — `prometheus-community` (`https://prometheus-community.github.io/helm-charts`)
 - `helmrelease.yaml` — `kube-prometheus-stack` 92.7.0 with the trimmed values;
@@ -58,6 +60,7 @@ target; saves memory).
 - `infrastructure/kustomization.yaml` gains `- monitoring`
 
 ### 3. Encrypt the Grafana secret
+
 ```bash
 cd /home/wasim/Sync/Repos/k8s-homelab-kvm
 # write plaintext secret.sops.yaml, then:
@@ -66,6 +69,7 @@ devpod ssh k8s-homelab-kvm --command \
 ```
 
 ### 4. Commit and let Flux reconcile
+
 ```bash
 git add infrastructure/monitoring infrastructure/kustomization.yaml
 git commit -m "feat(monitoring): add kube-prometheus-stack via Flux (Phase 6)"
@@ -77,6 +81,7 @@ devpod ssh k8s-homelab-kvm --command \
 ## Verification
 
 ### HelmRelease + pods
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'flux get helmreleases -A'
 devpod ssh k8s-homelab-kvm --command 'kubectl -n monitoring get pods'
@@ -85,11 +90,13 @@ devpod ssh k8s-homelab-kvm --command 'kubectl -n monitoring get pods'
 ```
 
 ### PVC + Service + route
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'kubectl -n monitoring get pvc,svc grafana,httproute'
 ```
 
 ### Prometheus targets
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'kubectl -n monitoring get --raw \
   "/api/v1/namespaces/monitoring/services/kube-prometheus-stack-prometheus:9090/proxy/api/v1/targets"' \
@@ -98,6 +105,7 @@ devpod ssh k8s-homelab-kvm --command 'kubectl -n monitoring get --raw \
 ```
 
 ### Grafana through the gateway
+
 ```bash
 devpod ssh k8s-homelab-kvm --command \
   'curl -s -H "Host: grafana.local" http://192.168.123.11/api/health'
@@ -108,6 +116,7 @@ devpod ssh k8s-homelab-kvm --command \
 ```
 
 ### Dashboards actually load (proves the OOM fix)
+
 ```bash
 # Grafana can list its dashboards (expect 24) …
 devpod ssh k8s-homelab-kvm --command \
@@ -121,6 +130,7 @@ devpod ssh k8s-homelab-kvm --command \
 ```
 
 ### No OOMKill / headroom
+
 ```bash
 devpod ssh k8s-homelab-kvm --command \
   'kubectl -n monitoring top pod -l app.kubernetes.io/name=grafana --containers'
@@ -132,6 +142,7 @@ devpod ssh k8s-homelab-kvm --command \
 ```
 
 ### Node memory after deploy
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'kubectl top nodes'
 # Observed: cp 1847Mi/2977Mi (63%), worker 903Mi/1463Mi (61%)
@@ -149,11 +160,14 @@ devpod ssh k8s-homelab-kvm --command 'kubectl top nodes'
 
 **Grafana** — via the Gateway. Add the host to your workstation's `/etc/hosts`
 (one-time, needs sudo):
-```
+
+```text
 192.168.123.11 grafana.local
 ```
+
 Then browse to <http://grafana.local> and log in as `admin` with the password
 from the SOPS secret:
+
 ```bash
 devpod ssh k8s-homelab-kvm --command \
   "kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d"
@@ -165,6 +179,7 @@ devpod ssh k8s-homelab-kvm --command \
 
 **Prometheus** — not exposed through the Gateway (ClusterIP only). Reach the UI
 with a port-forward tunnel from your workstation:
+
 ```bash
 devpod ssh k8s-homelab-kvm \
   -L 9090:127.0.0.1:9090 \
@@ -175,6 +190,7 @@ devpod ssh k8s-homelab-kvm \
 ## Troubleshooting (recorded)
 
 See [`troubleshooting-log.md`](../troubleshooting-log.md) for the full entries:
+
 - **HelmRelease schema error** — `spec.upgrade.remediation.retryInterval` is not a
   field; the retry strategy belongs at `spec.upgrade.strategy`. Fixed in `1f79895`.
 - **`flux reconcile` appears to hang** — it blocks until the Kustomization is

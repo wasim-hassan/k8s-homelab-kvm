@@ -7,12 +7,14 @@
 ## Decision
 
 Adopt **Trivy v0.75.0** (pinned, checksum-verified in the devcontainer image) as the sole security scanner:
-- Use `trivy config` for manifest/IaC policy checks (replaces kube-linter). 
-- Secret scanning is available via `trivy fs --scanners secret` (no DB). 
-- Image CVE, SBOM, and full secret/vuln scans are reserved for **Phase 8** (CI). 
+
+- Use `trivy config` for manifest/IaC policy checks (replaces kube-linter).
+- Secret scanning is available via `trivy fs --scanners secret` (no DB).
+- Image CVE, SBOM, and full secret/vuln scans are reserved for **Phase 8** (CI).
 - Pin ≥ 0.75.0 (post the 2026-03 malicious `0.69.4` incident); binary is installed in the workspace image with SHA256 against `trivy_0.75.0_checksums.txt`.
 
 Apply **Pod Security Standards (PSS)** per namespace:
+
 - `podinfo`: `enforce/restricted`, `warn/restricted`, `audit/restricted`. Deployment hardened: dedicated `ServiceAccount`, `automountServiceAccountToken: false`, `runAsNonRoot: true` + numeric `runAsUser:100`/`runAsGroup:101` + `fsGroup:101`, `seccompProfile: RuntimeDefault`, container `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `capabilities.drop: ["ALL"]`.
 - `envoy-gateway-system`: `enforce/restricted`, `warn/restricted`, `audit/restricted`. Verified Envoy pods have no `hostPort`/`hostNetwork`/`hostPID` and only `configMap`/`secret`/`emptyDir`/`projected` volumes; all containers satisfy restricted.
 - `flux-system` (Flux Operator–owned namespace): `enforce/restricted`, `warn/restricted`, `audit/restricted` applied **imperatively** (`kubectl label`), because the namespace is managed by the Flux Operator (`app.kubernetes.io/managed-by: flux-operator`) and the FluxInstance bootstraps/maintains the namespace's lifecycle. The controller pods in `flux-system` satisfy restricted; only Flux controllers run in that namespace (target workloads run elsewhere). This is documented as an intentional, reviewable exception to pure-GitOps management of that specific namespace label set. **⚠️ Amended 2026-10-15:** the imperative labels reverted after a VM restart, so they are now set **declaratively** via `FluxInstance.spec.commonMetadata.labels` — see [ADR-0008](0008-trivy-operator.md).
@@ -39,6 +41,7 @@ Apply **Pod Security Standards (PSS)** per namespace:
 | `KSV-0125` | Untrusted registry | `ghcr.io` is GitHub's FOSS registry (trusted here); the check's default list is Docker Hub-centric. Image pinned `ghcr.io/stefanprodan/podinfo` (was `6.7.1` here; since bumped to `6.15.0` in the Phase 7b findings triage — see [ADR-0008](0008-trivy-operator.md)). |
 
 ## References
+
 - [runbook 08](../runbooks/08-security-hardening.md) (execution details)
 - [system-inventory](../system-inventory.md#security-phase-7)
 - [trivy](https://github.com/aquasecurity/trivy) v0.75.0

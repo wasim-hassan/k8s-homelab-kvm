@@ -33,33 +33,39 @@
 ## Execution order
 
 ### 1. Bootstrap Flux (completed)
+
 - Used `flux bootstrap github --owner=wasim-hassan --repository=k8s-homelab-kvm --branch=main --path=clusters/k8s-homelab --personal --token-auth=false` with deploy key (read-only default). Controllers: source/kustomize/helm/notification (v2.9.6). Synced to `main@sha1:f23e2d6`, `df1643d`.
 - Output under `clusters/k8s-homelab/flux-system/{gotk-components.yaml,gotk-sync.yaml,kustomization.yaml}`.
 
 ### 2. SOPS/age (completed)
+
 - `age-keygen` → `~/.config/sops/age/keys.txt`. Public recipient in `.sops.yaml`.
-- `kubectl -n flux-system create secret generic sops-age --from-file=age.agekey=/home/dev/.config/sops/age/keys.txt` (out-of-band). 
+- `kubectl -n flux-system create secret generic sops-age --from-file=age.agekey=/home/dev/.config/sops/age/keys.txt` (out-of-band).
 - Decryption wired on `infrastructure` and `apps` Kustomizations (`spec.decryption.provider=sops`, `secretRef.name=sops-age`).
 - Demo secret `apps/podinfo/secret.sops.yaml` encrypted; Flux decrypts in-cluster → `podinfo-message` has `PODINFO_UI_MESSAGE: Hello from an SOPS-encrypted secret via Flux!`.
 
 ### 3. Envoy Gateway (completed)
+
 - `infrastructure/envoy-gateway/namespace.yaml`, `ocirepository.yaml` (gateway-helm v1.9.2), `helmrelease.yaml` (chart 1.9.2+be034275b55d), `gatewayclass.yaml` (controller `gateway.envoyproxy.io/gatewayclass-controller`), `gateway.yaml` (listener HTTP:80, allowedRoutes All), `kustomization.yaml`.
 - `infrastructure/kustomization.yaml` references `envoy-gateway/`; `infrastructure.yaml` Kustomization (flux-system) applies it with decryption.
 - Gateway `eg` in `envoy-gateway-system` becomes Programmed (address `192.168.123.11`), GatewayClass Accepted.
 
 ### 4. First workload (completed)
+
 - `apps/podinfo/` with requests/limits (Deployment), Service (ClusterIP 80→9898), HTTPRoute `podinfo.local` referencing Gateway `eg` in `envoy-gateway-system`, ReferenceGrant allowing HTTPRoute from `podinfo` to Gateway, SOPS secret, and `apps/kustomization.yaml`.
 - `apps.yaml` Kustomization depends on `infrastructure`.
 
 ## Verification
 
 ### Host + workspace start
+
 ```bash
 kvm; vm  # VMs running
 cd ~/Sync/Repos/k8s-homelab-kvm && devpod up . --ide none
 ```
 
 ### Cluster + Flux
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'kubectl get nodes -o wide'
 devpod ssh k8s-homelab-kvm --command 'flux get kustomizations -A'
@@ -68,11 +74,13 @@ devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get pods'
 ```
 
 ### Envoy Gateway
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'kubectl -n envoy-gateway-system get gatewayclass,gateway,helmrelease,svc'
 ```
 
 ### Podinfo + SOPS
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'kubectl -n podinfo get all,httproute,referencegrant'
 devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get secret sops-age -o jsonpath="{.metadata.name}"'
@@ -80,6 +88,7 @@ devpod ssh k8s-homelab-kvm --command 'kubectl -n podinfo get secret podinfo-mess
 ```
 
 ### Routing test
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'curl -sS -H "Host: podinfo.local" http://192.168.123.11/ | jq -r ".message"'
 # Expected: Hello from an SOPS-encrypted secret via Flux!

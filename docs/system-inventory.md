@@ -62,6 +62,7 @@ socket-activated and exits after ~120 s idle — this is normal, and the next
 socket-activated.
 
 **Images cached at:** `~/Documents/kvm-iso/cloudinit-vms/`
+
 - `ubuntu-24.04-server-cloudimg-amd64.img` (597 MB, refreshed 2026-09-26)
 - `AlmaLinux-9-GenericCloud-latest.x86_64.qcow2` (562 MB)
 
@@ -277,6 +278,7 @@ k8s-homelab-kvm`). `preflight.sh` and `10-prepare-nodes.sh` need only
 - Static reservations: `192.168.123.11` (cp), `192.168.123.12` (worker)
 
 **Why a dedicated network rather than `default`:** two reasons.
+
 1. `default` hands out addresses from a dynamic pool with no reservations, so
    node IPs change across reboots — that breaks Ansible inventories and any
    Terraform target referencing a fixed address.
@@ -319,6 +321,7 @@ Verified bidirectional: `k8s-cp-01` → `k8s-worker-01` and back both ping.
 > [`inventory/nodes.yml`](../inventory/nodes.yml) updated to match.
 
 **Watch items:**
+
 - `k8s-worker-01` had **~880 MiB available** idle before Phase 6 — headroom for
   node-exporter and scheduling.
 - `k8s-cp-01` had **~1600 MiB available** with the control plane up, which is

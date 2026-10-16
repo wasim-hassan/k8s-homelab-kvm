@@ -1,12 +1,13 @@
-# AGENTS.md — k8s-homelab-kvm
+# Project conventions: k8s-homelab-kvm
 
-Contract for any AI agent working in this repo. Read this **first**.
+Conventions and guardrails for anyone working in this repository. Read this
+first.
 
 This repo builds and documents a **2-node k3s homelab on libvirt/KVM**, operated
-from a **FOSS-only Devpod (Podman) workspace**. It is documentation-first:
-every change is verified and documented.
+from a **FOSS-only Devpod (Podman) workspace**. It is documentation-first: every
+change is verified and documented.
 
-## Read these first (canonical docs — do NOT duplicate their content here)
+## Canonical docs: do not duplicate their content here
 
 | Doc | Use it for |
 |---|---|
@@ -20,12 +21,14 @@ every change is verified and documented.
 State changes go in the docs (and `system-inventory.md`), not here.
 
 ## What this project is
+
 - A 2-node k3s cluster running on libvirt/KVM VMs.
 - Operator tooling (kubectl, helm, flux, …) runs **inside a Devpod
   workspace**, not on the host.
 - Everything is documented; the repo doubles as a portfolio piece.
 
 ## Hard constraints (non-negotiable)
+
 - **FOSS only.** No proprietary components, no vendor lock-in.
 - **FOSS-only naming.** Avoid `docker`, `vscode`, `dev-container`,
   `mcr.microsoft.com` in anything we name. The mandated spec names
@@ -47,8 +50,9 @@ State changes go in the docs (and `system-inventory.md`), not here.
 - **Commit/push only when the user explicitly asks.**
 
 ## Architecture snapshot
-> Authoritative, verified values live in
-> [`docs/system-inventory.md`](docs/system-inventory.md). Summary only:
+
+Authoritative, verified values live in
+[`docs/system-inventory.md`](docs/system-inventory.md). Summary only:
 
 | | `k8s-cp-01` | `k8s-worker-01` |
 |---|---|---|
@@ -78,13 +82,15 @@ State changes go in the docs (and `system-inventory.md`), not here.
 - Host: Fedora 44 Workstation · kubeconfig at `~/.kube/config` (host)
 
 ## Conventions
+
 - All docs live in `docs/`. One ADR per non-trivial decision.
-- Runbook format mirrors `~/Sync/Repos/runbook` (see the `runbook-writer` skill).
+- Runbooks follow the house format: Goal, Topology, Preconditions, Execution.
 - Commit messages: concise, imperative, scope-prefixed (`docs:`, `feat:`, `fix:`).
 - After a change: update `system-inventory.md` (state), `troubleshooting-log.md`
   (failures), and `roadmap.md` (phase status).
 
 ## Session workflow
+
 1. Start the environment per [runbook 03](docs/runbooks/03-session-lifecycle.md):
    `kvm on` → `vm start k8s-cp-01` → `vm start k8s-worker-01` → `devpod up . --ide none`.
 2. Read [`docs/roadmap.md`](docs/roadmap.md) for the current phase and open
@@ -94,6 +100,7 @@ State changes go in the docs (and `system-inventory.md`), not here.
 4. After work: verify, then document.
 
 ## Guardrails / anti-patterns
+
 | Don't | Do instead |
 |---|---|
 | `vm destroy` | `ssh <node> sudo poweroff` |
@@ -108,6 +115,7 @@ State changes go in the docs (and `system-inventory.md`), not here.
 | Commit secrets | keep them out; extend `.gitignore` |
 | Duplicate doc content into this file | point to the doc |
 
-## Private context
-Personal objectives and the per-session log live in `AGENTS.local.md`
-(**gitignored**). It is loaded via `opencode.json` → `instructions`.
+## Local notes
+
+Personal notes live in `AGENTS.local.md`, which is gitignored and never part of
+the published repository.

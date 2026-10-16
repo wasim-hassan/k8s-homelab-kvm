@@ -43,16 +43,19 @@ Use **TLP only**. Do not install `tuned`.
 ## Consequences
 
 **Positive**
+
 - One power-management tool. Behaviour is explainable from `/etc/tlp.conf` alone.
 - Nothing to uninstall or reconcile later.
 - Current defaults are already correct — no configuration work required.
 
 **Negative**
+
 - `tuned-adm` will not be available for per-profile tuning. If a future phase
   needs something TLP does not expose, the choice must be revisited explicitly
   rather than just installing `tuned`.
 
 **Neutral**
+
 - TLP's `RUNTIME_PM` aggressive power management can occasionally stall vCPU
   threads under nested virtualization. This has **not** been observed. The
   setting should be left at its default unless a real performance problem

@@ -1,0 +1,40 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: yamllint
+        run: |
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install --quiet yamllint==1.38.0
+          /tmp/venv/bin/yamllint -f github .
+
+      - name: kubeconform
+        run: |
+          curl -sSL -o /tmp/kubeconform.tgz \
+            https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          sudo tar xzf /tmp/kubeconform.tgz -C /usr/local/bin kubeconform
+          files=$(git ls-files '*.yaml' '*.yml' \
+            | grep -E '^(apps|clusters)/' \
+            | grep -v '\.sops\.yaml$')
+          kubeconform -summary -ignore-missing-schemas \
+            -kubernetes-version 1.37.1 $files
+
+      - name: shellcheck
+        run: shellcheck --severity=warning --exclude=SC1091 scripts/*.sh
+
+      - name: markdownlint
+        run: npx --yes markdownlint-cli2@0.23.3 "docs/**/*.md" "*.md" "AGENTS.md"

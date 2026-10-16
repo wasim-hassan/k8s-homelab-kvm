@@ -36,7 +36,9 @@ Gateway**, so anonymous admin is acceptable here (SSO is the upgrade path).
 ## Execution order
 
 ### 1. Install the operator (no Flux migration yet)
+
 `infrastructure/flux-operator/` holds:
+
 - `ocirepository.yaml` — OCIRepository `flux-operator`, tag pinned **`0.61.0`**.
 - `helmrelease.yaml` — HelmRelease `flux-operator` (releaseName `flux-operator`)
   with `install.crds: Create` / `upgrade.crds: CreateReplace` and values:
@@ -53,6 +55,7 @@ Gateway**, so anonymous admin is acceptable here (SSO is the upgrade path).
 - `infrastructure/kustomization.yaml` gains `- flux-operator`.
 
 ### 2. Adopt Flux with a FluxInstance (separate Kustomization!)
+
 `clusters/k8s-homelab/flux-instance/` holds `fluxinstance.yaml` — a `FluxInstance`
 named `flux` mirroring the original `flux bootstrap` (distribution `2.9.x` @
 `ghcr.io/fluxcd`; components source/kustomize/helm/notification; `sync` =
@@ -69,6 +72,7 @@ with `dependsOn: [infrastructure]`.
 > guarantees the operator CRDs exist first. See the troubleshooting log.
 
 ### 3. Retire the repo-managed Flux manifests
+
 Because the operator now owns the Flux components, GitRepository and Kustomization,
 delete `clusters/k8s-homelab/flux-system/` (`gotk-components.yaml`,
 `gotk-sync.yaml`) and drop `- flux-system` from
@@ -78,6 +82,7 @@ every object it manages with `kustomize.toolkit.fluxcd.io/prune: Disabled`
 controllers.
 
 ### 4. Commit and let Flux reconcile
+
 ```bash
 cd /home/wasim/Sync/Repos/k8s-homelab-kvm
 git add infrastructure clusters
@@ -90,6 +95,7 @@ devpod ssh k8s-homelab-kvm --command \
 ## Verification
 
 ### Operator + FluxInstance
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'flux get helmreleases -A'      # flux-operator Ready
 devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get fluxinstance'
@@ -98,6 +104,7 @@ devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get fluxinstance'
 ```
 
 ### Adoption (Flux now managed by the operator)
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'flux trace kustomization flux-system'
 # Expect: "object not managed by Flux"  ← the operator owns it now
@@ -110,6 +117,7 @@ devpod ssh k8s-homelab-kvm --command 'kubectl get crd | grep -c fluxcd'   # CRDs
 ```
 
 ### Route + UI
+
 ```bash
 devpod ssh k8s-homelab-kvm --command 'kubectl -n flux-system get httproute flux-operator'
 devpod ssh k8s-homelab-kvm --command 'curl -s -o /dev/null -w "%{http_code}\n" \
@@ -119,9 +127,11 @@ devpod ssh k8s-homelab-kvm --command 'curl -s -o /dev/null -w "%{http_code}\n" \
 ## Access the UI
 
 Add the host to your workstation's `/etc/hosts` (one-time, needs sudo):
-```
+
+```text
 192.168.123.11 flux.local
 ```
+
 Then browse to <http://flux.local>. No login is required (anonymous), and the UI
 runs as the `flux-admin` group, which is bound to `flux-web-admin` (view +
 reconcile/suspend/resume/restart actions).
@@ -133,6 +143,7 @@ reconcile/suspend/resume/restart actions).
 ## Troubleshooting (recorded)
 
 See [`troubleshooting-log.md`](../troubleshooting-log.md) for the full entry:
+
 - **`no matches for kind "FluxInstance"` → the whole `infrastructure` apply
   aborted** — `kustomize-controller` dry-runs the set first, so the FluxInstance
   blocked the operator from being created. Fixed by moving the FluxInstance into a

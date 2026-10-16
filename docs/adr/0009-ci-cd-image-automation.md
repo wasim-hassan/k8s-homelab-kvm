@@ -18,6 +18,7 @@ Build the image in **GitHub Actions**, push to **GHCR**, and let **Flux image
 automation** write new tags back to git.
 
 ### 1. A workload we actually build — `ratlab-demo`
+
 - A tiny FOSS **Go** HTTP server ([`images/ratlab-demo/`](../../images/ratlab-demo))
   exposing `/` (version + hostname), `/version` (JSON), `/healthz`, `/readyz`.
 - Multi-stage build: `golang:1.23-alpine` → **`scratch`**, static binary, `USER
@@ -27,6 +28,7 @@ automation** write new tags back to git.
   `ratlab-demo.local` through the existing Envoy Gateway.
 
 ### 2. CI: GitHub Actions → GHCR
+
 - Workflow [`.github/workflows/ci.yaml`](../../.github/workflows/ci.yaml) on push
   to `main` (paths `images/ratlab-demo/**`), on `v*` tags, on PRs and manually.
 - **Buildx** build + push to `ghcr.io/wasim-hassan/ratlab-demo`; tags via
@@ -50,6 +52,7 @@ automation** write new tags back to git.
   cluster; the local workspace remains FOSS-only.
 
 ### 3. Flux image automation (write-back)
+
 - The **`image-reflector-controller`** and **`image-automation-controller`** are
   added to `FluxInstance.spec.components`
   ([`flux-instance.yaml`](../../clusters/k8s-homelab/flux-instance/fluxinstance.yaml)).
@@ -65,6 +68,7 @@ automation** write new tags back to git.
   Flux rewrites the tag in git; the `apps` Kustomization then rolls it out.
 
 ### 4. Write-back credential (why a second key)
+
 - In `image.toolkit.fluxcd.io/v1` there is **no `git.push.secretRef`** — push
   credentials come from the **`sourceRef` GitRepository**. The bootstrap key is
   **read-only**, and swapping it would risk losing read access.
@@ -99,6 +103,7 @@ automation** write new tags back to git.
   before the manual step).
 
 ## References
+
 - [runbook 09](../runbooks/09-ci-cd-image-automation.md) (execution + verification)
 - [system-inventory — CI/CD](../system-inventory.md#cicd--image-automation-phase-8)
 - [roadmap — Phase 8](../roadmap.md#phase-8--cicd--image-automation)

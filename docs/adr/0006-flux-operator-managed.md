@@ -34,7 +34,7 @@ Kustomization.
 the supported Flux Web UI.
 
 - Operator installed declaratively (`infrastructure/flux-operator/`): OCIRepository
-  + HelmRelease, chart **0.61.0**.
+  - HelmRelease, chart **0.61.0**.
 - `FluxInstance flux` mirrors the original bootstrap (same repo/branch/path and
   `pullSecret`), so adoption is transparent.
 - The repo-managed Flux manifests (`clusters/k8s-homelab/flux-system/`) are
@@ -60,12 +60,14 @@ cluster has headroom after the Phase 6 sizing bump.
 ## Consequences
 
 **Positive**
+
 - A real, maintained, browser-based Flux dashboard (status, graph, actions).
 - Flux is now managed from a single `FluxInstance`; the operator handles upgrades
   and keeps the components/source in sync.
 - No new host or workspace tooling — the operator runs in-cluster, installed by Flux.
 
 **Negative**
+
 - **Phase 3 architecture changed:** Flux is no longer bootstrapped by the Flux CLI;
   the `flux-system/` bootstrap directory is gone. `flux bootstrap` is no longer the
   upgrade path — the `FluxInstance` distribution version is.
@@ -74,6 +76,7 @@ cluster has headroom after the Phase 6 sizing bump.
 - One more controller to run and reason about.
 
 **Neutral**
+
 - The `flux` CLI still works for day-to-day status (`flux get`, `flux trace`);
   `flux trace kustomization flux-system` now reports "not managed by Flux", which
   is expected.

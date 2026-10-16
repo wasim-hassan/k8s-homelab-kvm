@@ -7,12 +7,14 @@
 **Preconditions:** Phases 0–7b done; cluster healthy; Flux Healthy; repo pushed to `wasim-hassan/k8s-homelab-kvm`. A GitHub account with admin on the repo (for the one-time deploy key + package visibility). `sops`/age key available in the workspace.
 
 ## 01. The app we build — `ratlab-demo`
+
 - Source: [`images/ratlab-demo/`](../../images/ratlab-demo) — `main.go`, `go.mod`, `Containerfile`.
 - Endpoints: `/` (version + hostname), `/version` (JSON), `/healthz`, `/readyz`. Env: `PORT` (default `8080`).
 - `Containerfile`: `golang:1.23-alpine` build → `scratch`, static binary, `USER 65532:65532`, `EXPOSE 8080`. Single `linux/amd64` platform.
 - Version is injected at build: `-ldflags "-X main.version=<tag>"` via the build `ARG VERSION`.
 
 ## 02. CI workflow — GitHub Actions → GHCR
+
 - File: [`.github/workflows/ci.yaml`](../../.github/workflows/ci.yaml). Triggers: push to `main` (paths `images/ratlab-demo/**`), `v*` tags, PRs, manual dispatch.
 - Permissions: `contents: read`, `packages: write`, `id-token: write`, `attestations: write`, `security-events: write`.
 - Steps: `actions/checkout@v4` → `docker/setup-buildx-action@v3` → `docker/login-action@v3` (GHCR, `GITHUB_TOKEN`) → `docker/metadata-action@v5` (tags `{{version}}`, `{{major}}.{{minor}}`, branch, `sha`, `latest`) → `docker/build-push-action@v6` (push; `provenance: false`, `sbom: false`, gha cache) → trivy → SARIF upload → SBOM → provenance attestation.
@@ -24,10 +26,13 @@
 - `imagetools inspect ghcr.io/wasim-hassan/ratlab-demo:<tag>` (or `docker buildx imagetools`) shows the attestation manifest.
 
 ## 03. One-time credential setup (manual)
+
 1. **Write deploy key.** Generate the keypair + SOPS secret (see §03a), then in GitHub → *Repo → Settings → Deploy keys → Add deploy key*, paste the **public** key printed by the script and **✅ Allow write access**. With the `gh` CLI this is one command: `gh repo deploy-key add <pub-file> -R wasim-hassan/k8s-homelab-kvm --title flux-image-automation --allow-write`.
    - Public key (for reference):
      `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILFF6guelbTRKHkx7x9PJuTQf81Kz4IpWnFWaKL4iLer flux-image-automation@ratlab`
+
 - (a) Regenerate/rotate the key at any time:
+
   ```bash
   cd /workspaces/k8s-homelab-kvm
   KEYDIR="$(mktemp -d)"; trap 'rm -rf "$KEYDIR"' EXIT
@@ -37,9 +42,11 @@
   sops --encrypt --in-place clusters/k8s-homelab/image-automation/git-write-secret.sops.yaml
   cat "$KEYDIR/id_ed25519.pub"
   ```
+
 - **Package visibility:** after the first successful CI push, set the GHCR package `ratlab-demo` to **public** (`https://github.com/users/<user>/packages/container/ratlab-demo/settings` → *Danger Zone → Change visibility → Public*). This lets the `ImageRepository` scan it and lets kubelet pull the image without a registry secret. **UI-only:** GHCR has **no REST/CLI endpoint** to change package visibility (a `PATCH` returns 404), so this can't be automated. (Alternative: keep it private and add a `dockerconfigjson` pull secret + `ImageRepository.spec.secretRef` — not used here.)
 
 ## 03b. Flux image-automation manifests
+
 - Path: [`clusters/k8s-homelab/image-automation/`](../../clusters/k8s-homelab/image-automation) — `kustomization.yaml`, `git-repository.yaml`, `image-repository.yaml`, `image-policy.yaml`, `image-update-automation.yaml`, `git-write-secret.sops.yaml`.
 - `FluxInstance.spec.components` gains `image-reflector-controller` + `image-automation-controller`.
 - `GitRepository/flux-git-write` (source `v1`): same repo, `secretRef: flux-git-write`, **write** access.
@@ -50,11 +57,13 @@
 - **Schema gotchas (v1):** there is **no** `spec.git.push.secretRef` (creds come from the `sourceRef` GitRepository); `spec.update.strategy` accepts **`Setters`** (not `Settle`).
 
 ## 04. The workload + setter marker
+
 - [`apps/ratlab-demo/`](../../apps/ratlab-demo): `namespace.yaml` (PSS `restricted`), `serviceaccount.yaml` (no token automount), `deployment.yaml`, `service.yaml`, `httproute.yaml`, `referencegrant.yaml` (grants the route in `envoy-gateway-system`).
 - The Deployment image line carries the marker Flux rewrites:
   `image: ghcr.io/wasim-hassan/ratlab-demo:0.1.0 # {"$imagepolicy": "flux-system:ratlab-demo"}`.
 
 ## 05. Verify the pipeline end-to-end
+
 ```bash
 # Controllers
 kubectl -n flux-system get deploy image-reflector-controller image-automation-controller
@@ -72,14 +81,17 @@ kubectl -n flux-system get imageupdateautomation flux-system
 kubectl -n ratlab-demo get pods
 kubectl -n ratlab-demo rollout status deploy/ratlab-demo --timeout=90s
 ```
+
 - **Cut a release:** `git tag -a v0.1.3 -m 'ratlab-demo v0.1.3' && git push origin v0.1.3` (bump the number each time). CI builds/pushes; `ImagePolicy` resolves the new semver on its next scan (≤5m); `ImageUpdateAutomation` commits an updated tag to `main`; the `apps` Kustomization rolls it out. No manual YAML edit. Verified hands-off for `v0.1.1`→`v0.1.3`.
 - App is reachable at `http://ratlab-demo.local` (host `/etc/hosts` → `192.168.123.11`).
 
 ## 06. Docs + commit
+
 - ADR-0009 written; runbook 09 written; update `docs/system-inventory.md` (CI/CD + image-automation section), `docs/roadmap.md` (Phase 8 → done), `docs/README.md`, `AGENTS.md` (runbook index, architecture bullets).
 - Commits: `feat(phase-8): CI/CD + Flux image automation` + follow-up schema fixes. Push from host.
 
 ## Notes / exceptions
+
 - **No `push.secretRef` in v1** — the write `GitRepository` is the credential carrier; the operator-managed read `flux-system` source is left untouched.
 - **Release-driven:** `ImagePolicy` matches **semver** (`>=0.1.0`), so only `vX.Y.Z` tags are deployed. Main-branch pushes produce `sha`/`latest` tags that no policy matches (by design).
 - **`Setters`** is the only `update.strategy` value in v1.

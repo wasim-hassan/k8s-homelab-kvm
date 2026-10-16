@@ -82,7 +82,7 @@ devpod delete k8s-homelab-kvm   # destroy container (mounts are host dirs)
 > empty — that is the normal stopped state (rootless containers don't
 > auto-start). Resume with `devpod up . --ide none`. For the full
 > host→VM→workspace start order, see [runbook 03](03-session-lifecycle.md).
-
+>
 > **Run the cluster scripts from inside the workspace.** `20-…`, `30-…` and
 > `40-verify.sh` require `kubectl` on `PATH`, which now lives only in the
 > workspace. `preflight.sh` and `10-prepare-nodes.sh` need only `ssh`/`python3`
@@ -193,6 +193,7 @@ Add `--userns=keep-id` **and** `--security-opt=label=disable`, then
 ### `k9s` exits immediately / `could not create … /home/dev/.config/k9s`
 
 Two causes seen:
+
 1. **TERM** — kitty sets `TERM=xterm-kitty`; without kitty terminfo the TUI
    can't start. Fixed by installing `kitty-terminfo` in the image.
 2. **Config dir** — `/home/dev/.config` must exist and be dev-owned in the image.
