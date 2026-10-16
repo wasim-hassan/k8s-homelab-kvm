@@ -3,7 +3,7 @@
 Verified state of the host and cluster. Every value below was confirmed by running
 the command shown, not assumed.
 
-Last verified: 2026-10-15
+Last verified: 2026-10-16
 
 ---
 
@@ -395,6 +395,9 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 | 3 | Flux upgraded to **operator-managed** (Flux Operator 0.61.0 + FluxInstance) with the Flux Web UI at `flux.local` ([ADR-0006](adr/0006-flux-operator-managed.md), [runbook 07](runbooks/07-flux-webui.md)) | ✅ done |
 | 7 | Security hardening — trivy CLI, PSS, RBAC, secrets hygiene ([ADR-0007](adr/0007-security-hardening.md)) | ✅ done |
 | 7b | **Trivy Operator** + Grafana dashboard (continuous scanning); `flux-system` PSS labels made declarative ([ADR-0008](adr/0008-trivy-operator.md)) | ✅ done |
+| 8 | CI/CD — GitHub Actions builds `ratlab-demo` → GHCR (trivy + SBOM + provenance) ([ADR-0009](adr/0009-ci-cd-image-automation.md)) | ✅ done |
+| 8 | Flux image automation — image-reflector + image-automation controllers, ImageRepository/ImagePolicy/ImageUpdateAutomation, SOPS write key ([ADR-0009](adr/0009-ci-cd-image-automation.md)) | ✅ done |
+| 8 | `ratlab-demo` workload deployed via Flux (Deployment/Service/HTTPRoute), image tag managed by Flux | ⏳ pending manual GHCR visibility + write deploy key |
 
 ### Deferred / not yet done
 
@@ -474,6 +477,38 @@ cluster-wide **Critical 6 → 0**, total **897 → 701**. The remaining findings
 on upstream/system images (coredns, flux controllers, klipper-helm,
 kube-state-metrics, …) and required system RBAC objects; they are remediated by
 platform upgrades and otherwise **accepted** (see [ADR-0008](adr/0008-trivy-operator.md#findings-triage-accepted-risk)).
+
+---
+
+## CI/CD + image automation (Phase 8)
+
+Added 2026-10-16. See [ADR-0009](adr/0009-ci-cd-image-automation.md) and
+[runbook 09](runbooks/09-ci-cd-image-automation.md).
+
+| Item | Value |
+|---|---|
+| App built | `ratlab-demo` — Go HTTP server, `scratch` image, `USER 65532:65532` ([`images/ratlab-demo/`](../images/ratlab-demo)) |
+| Registry | `ghcr.io/wasim-hassan/ratlab-demo` (GHCR) |
+| CI | GitHub Actions [`.github/workflows/ci.yaml`](../.github/workflows/ci.yaml) — buildx build/push; tags from `docker/metadata-action` (`{{version}}`, `{{major}}.{{minor}}`, branch, `sha`, `latest`) |
+| Supply chain | trivy image scan (`aquasecurity/trivy-action@0.36.0`, SARIF, severity CRITICAL/HIGH, ignore-unfixed) · SBOM (`anchore/sbom-action@v0` / syft, SPDX-JSON) · provenance (`actions/attest-build-provenance@v4`, pushed to registry) |
+| Flux components added | `image-reflector-controller`, `image-automation-controller` (via `FluxInstance.spec.components`) |
+| `ImageRepository` | `flux-system/ratlab-demo` → `ghcr.io/wasim-hassan/ratlab-demo`, 5m |
+| `ImagePolicy` | `flux-system/ratlab-demo` — semver `>=0.1.0` |
+| `ImageUpdateAutomation` | `flux-system/flux-system` — `update.strategy: Setters`, commits to `main` |
+| Write GitRepository | `flux-system/flux-git-write` (`source.toolkit.fluxcd.io/v1`) backed by SOPS Secret `flux-git-write` (`identity`/`identity.pub`/`known_hosts`) |
+| Setter marker | `apps/ratlab-demo/deployment.yaml`: `# {"$imagepolicy": "flux-system:ratlab-demo"}` |
+| Workload | `ratlab-demo` ns (PSS `restricted`) — Deployment/Service/HTTPRoute, routed at `ratlab-demo.local` |
+| Tag convention | release-driven: only `vX.Y.Z` tags match the `ImagePolicy` (main pushes produce unmatched `sha`/`latest`) |
+| Manual prerequisites | (1) write deploy key added on GitHub; (2) GHCR package `ratlab-demo` set **public** |
+
+**Verified this session:** image ref+automation controllers `1/1 Running`; CRDs
+`imagerepositories/imagepolicies/imageupdateautomations` present; `image-automation`
+Kustomization `Ready`; the write `GitRepository`, `ImageRepository`, `ImagePolicy`,
+`ImageUpdateAutomation` objects created. **Pending (manual, GitHub-side):** adding
+the write deploy key (`flux-git-write` source currently `Ready=False: unable to
+authenticate`) and making the GHCR package public (`ImageRepository` currently
+`DENIED: requested access to the resource is denied`) — until then `ratlab-demo`
+is `ImagePullBackOff`.
 
 ---
 

@@ -8,7 +8,8 @@ block each phase. This is also the **resume point** for a new session: read the
 - **Done so far:** Phases 0–3 (substrate, k3s cluster, operator workspace + k9s,
   GitOps: Flux CD + SOPS/age, Envoy Gateway, first workload), Phase 5 (scripts),
   Phase 6 (observability), Phase 7 (security hardening), Phase 7b (Trivy Operator
-  + Grafana dashboard) — see [system-inventory.md](system-inventory.md#current-phase-status).
+  + Grafana dashboard), Phase 8 (CI/CD + Flux image automation) — see
+  [system-inventory.md](system-inventory.md#current-phase-status).
 - **Last verified:** 2026-10-16
 - **Done so far (verified):** substrate (KVM/libvirt/VMs), k3s cluster,
   Devpod workspace, k9s, GitOps (Flux + SOPS/age + Envoy Gateway + podinfo),
@@ -17,23 +18,23 @@ block each phase. This is also the **resume point** for a new session: read the
   **Phase 7 security hardening** (trivy, PSS, RBAC, secrets hygiene,
   [ADR-0007](adr/0007-security-hardening.md)), and **Phase 7b** — the
   **Trivy Operator** for continuous in-cluster scanning with a Grafana dashboard
-  ([ADR-0008](adr/0008-trivy-operator.md)).
-- **Current focus:** Phase 8 (CI/CD + image automation).
-  Phase 3 (GitOps) done 2026-10-14; Phase 5 (IaC) re-scoped 2026-10-15
-  ([ADR-0005](adr/0005-no-ansible-node-config.md)); Phase 6 (Observability)
-  **done** 2026-10-15; Flux moved to operator-managed + Web UI **done** 2026-10-15
-  ([runbook 07](runbooks/07-flux-webui.md)); Phase 7 (Security) **done**
-  2026-10-15 ([runbook 08](runbooks/08-security-hardening.md)); Phase 7b (Trivy
-  Operator) **done** 2026-10-16 ([ADR-0008](adr/0008-trivy-operator.md)).
-- **Remaining:** Phase 8 and the deferred/stretch items.
+  ([ADR-0008](adr/0008-trivy-operator.md)), and **Phase 8** — CI/CD via GitHub
+  Actions → GHCR with **Flux image automation** ([ADR-0009](adr/0009-ci-cd-image-automation.md)).
+- **Current focus:** maintenance + the deferred/stretch items (Talos, storage,
+  backup). All planned phases 0–8 are done.
+- **Phase timeline:** Phase 3 (GitOps) done 2026-10-14; Phase 5 (IaC) re-scoped
+  2026-10-15 ([ADR-0005](adr/0005-no-ansible-node-config.md)); Phase 6
+  (Observability) **done** 2026-10-15; Flux moved to operator-managed + Web UI
+  **done** 2026-10-15 ([runbook 07](runbooks/07-flux-webui.md)); Phase 7 (Security)
+  **done** 2026-10-15 ([runbook 08](runbooks/08-security-hardening.md)); Phase 7b
+  (Trivy Operator) **done** 2026-10-16 ([ADR-0008](adr/0008-trivy-operator.md));
+  Phase 8 (CI/CD + image automation) **done** 2026-10-16
+  ([ADR-0009](adr/0009-ci-cd-image-automation.md)).
+- **Remaining:** the deferred/stretch items (Talos, storage, backup).
 
-### Next phase — Phase 8 (CI/CD + image automation)
-- **Objective.** Automate the build→ship path: turn a commit into a running
-  deployment, and keep image tags current without manual bumps.
-- **Scope.** Build images in CI (GitHub Actions), push to a registry (ghcr.io);
-  add the Flux **image-automation** controllers to write new image tags back to
-  git; wire `trivy image` + SBOM into the pipeline. End-to-end:
-  commit → CI builds → Flux deploys. Locked to `.devcontainer` tooling / FOSS only.
+### Status — all planned phases complete
+Phases 0–8 are **done**. The phase sections below are the closed record; the
+forward plan is now the [stretch items](#stretch-later).
 
 > **Version note.** Component versions below were researched first, then
 > **pinned and verified in the cluster** at install time. Re-verify before
@@ -243,6 +244,19 @@ scanning — and provide the requested "trivy web UI" without adding a bespoke a
 - **Flux image-automation** controller to bump image tags from registry to git.
 - End-to-end: commit app change → CI builds → Flux deploys.
 
+> **Status: ✅ complete (2026-10-16).** Implemented as ADR-0009 / runbook 09.
+> A FOSS **Go** app (`ratlab-demo`, `images/ratlab-demo`, `scratch`, nonroot) is
+> built by **GitHub Actions → GHCR** with trivy scan + SBOM (syft) + provenance
+> attestation. The Flux **image-reflector** + **image-automation** controllers are
+> enabled in the `FluxInstance`; an `ImageRepository`/`ImagePolicy` (semver
+> `>=0.1.0`)/`ImageUpdateAutomation` (strategy `Setters`) writes new tags back to
+> git via a dedicated **write** `GitRepository` backed by a **SOPS** deploy key.
+> The `ratlab-demo` Deployment carries the `$imagepolicy` marker and is rolled out
+> by the `apps` Kustomization on each release tag.
+> **One-time manual steps (GitHub):** add the write **deploy key** and set the
+> GHCR package **public**. See [ADR-0009](adr/0009-ci-cd-image-automation.md),
+> [runbook 09](runbooks/09-ci-cd-image-automation.md).
+
 ---
 
 ## Stretch (later)
@@ -314,8 +328,13 @@ To pick this up in a new session:
    **Grafana dashboard** (17813) at `grafana.local`; infra-assessment disabled to
    stay `restricted`; `flux-system` PSS labels made declarative. See
    [ADR-0008](adr/0008-trivy-operator.md).
-10. **Next: Phase 8 (CI/CD + image automation)** — build images in CI, push to a
-   registry, Flux image automation, and wire `trivy image`/SBOM into the pipeline.
+10. **Phase 8 done** (2026-10-16): CI/CD via **GitHub Actions → GHCR** (trivy +
+    SBOM + provenance) and **Flux image automation** (image-reflector +
+    image-automation controllers, `ImageRepository`/`ImagePolicy`/
+  `ImageUpdateAutomation`, SOPS write key) driving the `ratlab-demo` workload.
+   **Two one-time GitHub steps remain:** add the write deploy key and set the
+   GHCR package public. See [ADR-0009](adr/0009-ci-cd-image-automation.md),
+   [runbook 09](runbooks/09-ci-cd-image-automation.md).
 
 ---
 

@@ -3,12 +3,12 @@
 A 2-node k3s homelab on libvirt/KVM, with the operator toolchain in a FOSS-only
 Devpod (Podman) workspace. This index links every document.
 
-Current phase: **7 complete** (Phases 0–3, 5–7: k3s, workspace, k9s, GitOps with
-Flux/SOPS, the observability stack, and security hardening), plus the **Flux Web
-UI** (Flux migrated to the Flux Operator) and **Phase 7b** — the **Trivy Operator**
-for continuous scanning with a Grafana dashboard. **Phase 8 (CI/CD + image
-automation) is next.** See the [roadmap](roadmap.md) for the forward plan and
-decisions.
+Current phase: **all planned phases (0–8) complete** — k3s, workspace, k9s, GitOps
+with Flux/SOPS, the observability stack, security hardening, the **Flux Web UI**
+(Flux migrated to the Flux Operator), the **Trivy Operator** (continuous scanning +
+Grafana dashboard), and **Phase 8** — CI/CD via GitHub Actions → GHCR with **Flux
+image automation** and supply-chain artifacts (trivy + SBOM + provenance). See the
+[roadmap](roadmap.md) for the forward plan (now stretch items) and decisions.
 
 ---
 
@@ -24,6 +24,7 @@ decisions.
 | 06 | [Observability](runbooks/06-observability.md) | kube-prometheus-stack via Flux, Grafana route, Prometheus targets |
 | 07 | [Flux Web UI](runbooks/07-flux-webui.md) | migrate Flux to the Flux Operator, Flux Status UI at `flux.local` |
 | 08 | [Security hardening](runbooks/08-security-hardening.md) | trivy, PSS, RBAC, secrets hygiene + Trivy Operator (Phase 7b) |
+| 09 | [CI/CD + image automation](runbooks/09-ci-cd-image-automation.md) | GitHub Actions → GHCR, trivy + SBOM + provenance, Flux image automation |
 
 ## ADRs (why)
 
@@ -37,13 +38,14 @@ decisions.
 | 0006 | [Flux managed by the Flux Operator (Web UI)](adr/0006-flux-operator-managed.md) *(accepted)* |
 | 0007 | [Security hardening (trivy, PSS, RBAC)](adr/0007-security-hardening.md) *(accepted)* |
 | 0008 | [Continuous scanning — Trivy Operator + Grafana](adr/0008-trivy-operator.md) *(accepted)* |
+| 0009 | [CI/CD + Flux image automation](adr/0009-ci-cd-image-automation.md) *(accepted)* |
 
 ## Reference
 
 | Doc | What |
 |---|---|
 | [System inventory](system-inventory.md) | verified host + cluster + workspace state |
-| [Roadmap](roadmap.md) | phase plan (remaining: 8) + decision log |
+| [Roadmap](roadmap.md) | phase plan (all done; stretch remains) + decision log |
 | [Troubleshooting log](troubleshooting-log.md) | every real failure: symptom → cause → fix → lesson |
 
 ## Code / config
@@ -57,7 +59,10 @@ decisions.
 | [`../config/k9s/`](../config/k9s) | k9s config, hotkeys, gruvbox skin (mounted via `K9S_CONFIG_DIR`) |
 | [`../clusters/`](../clusters) | Flux app-of-apps (`clusters/k8s-homelab/`) |
 | [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring, Flux Operator, Trivy Operator) |
-| [`../apps/`](../apps) | workloads (podinfo) with encrypted secrets |
+| [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring, Flux Operator, Trivy Operator) |
+| [`../apps/`](../apps) | workloads (podinfo, ratlab-demo) with encrypted secrets |
+| [`../images/`](../images) | app source built by CI (`ratlab-demo`) |
+| [`../.github/`](../.github/workflows/ci.yaml) | GitHub Actions CI (build → GHCR, trivy, SBOM, provenance) |
 | [`../.devcontainer/`](../.devcontainer) | `Containerfile` + `devcontainer.json` |
 
 ## Reading order (newcomer)

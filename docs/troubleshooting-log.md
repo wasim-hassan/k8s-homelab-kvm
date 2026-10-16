@@ -1044,8 +1044,48 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   ```
 - **Root cause:** `flux-instance` declares `dependsOn: infrastructure`. The `dependsOn` check is **revision-based**: on a new source revision each Kustomization reconciles independently, and `flux-instance` can be evaluated *after* the source updates but *before* `infrastructure` has re-applied the same revision. The message is a transient ordering artifact, not a drift or a config error.
 - **Fix:** Nudge the dependent so it re-evaluates: `flux reconcile kustomization flux-instance -n flux-system`. It then sees `infrastructure` at the matching revision and goes Ready.
+- **Lesson:** A `dependency ... revision is not up to date` message that clears on its own (or after a nudge) is **not** a bug — don't "fix" the manifests for it. Only investigate if a Kustomization stays stuck at a **stale** revision while its dependency sits at a newer one.
+
+## 2026-10-16 — ImageUpdateAutomation rejected by the `image.toolkit.fluxcd.io/v1` schema (`push.secretRef`, `update.strategy: Settle`)
+
+- **Context:** Phase 8 added the Flux image-automation CRs. The `image-automation` Kustomization went `Ready=False` on a **dry-run** validation error and applied nothing (so no `ImageRepository`/`ImagePolicy`/secret appeared).
+- **Symptom:** two successive schema errors while iterating on one file:
+  ```text
+  .spec.git.push.secretRef: field not declared in schema
+  spec.update.strategy: Unsupported value: "Settle": supported values: "Setters"
+  ```
+- **Root cause:** the **v1** API changed from the older `v1beta2` examples:
+  1. `ImageUpdateAutomation` **no longer has `spec.git.push.secretRef`** — push credentials are taken from the **`sourceRef` GitRepository's** own `secretRef`. There is no separate push secret anymore.
+  2. `spec.update.strategy` accepts only **`Setters`** (the value `Settle` is invalid/removed).
+- **Fix:**
+  - Drop `spec.git.push.secretRef`; instead create a **dedicated write `GitRepository`** (`flux-git-write`) that references the write deploy key, and set `ImageUpdateAutomation.spec.sourceRef` to it. This also avoids repointing the operator-managed read `flux-system` source (which would break git access before the write key is authorized).
+  - Set `spec.update.strategy: Setters`.
 - **Verify:**
   ```bash
-  flux get kustomizations -A   # all four: Ready=True at the same revision
+  flux get kustomization image-automation -n flux-system   # Ready=True
+  kubectl -n flux-system get imagerepository,imagepolicy,imageupdateautomation
   ```
-- **Lesson:** A `dependency ... revision is not up to date` message that clears on its own (or after a nudge) is **not** a bug — don't "fix" the manifests for it. Only investigate if a Kustomization stays stuck at a **stale** revision while its dependency sits at a newer one.
+- **Lesson:** Flux API docs/examples are often still `v1beta2`. Confirm the field against the **installed CRD** before trusting a manifest: `kubectl get crd <plural>.image.toolkit.fluxcd.io -o json | jq '.spec.versions[].schema'`. Kustomize-controller dry-runs the whole bundle, so one bad field blocks the entire Kustomization.
+
+## 2026-10-16 — `ratlab-demo` is `ImagePullBackOff` until two GitHub-side steps are done (expected, not a bug)
+
+- **Context:** First deploy of the Phase 8 workload. The Pod sits in `ImagePullBackOff`, the `ImageRepository` shows `DENIED`, and `GitRepository/flux-git-write` shows an SSH auth failure.
+- **Symptom:**
+  ```text
+  imagerepository ratlab-demo: scan failed: ...ghcr.io/token...: DENIED: requested access to the resource is denied
+  gitrepository flux-git-write: ssh: handshake failed: ssh: unable to authenticate ...
+  pod ratlab-demo-...: ImagePullBackOff
+  ```
+- **Root cause:** two one-time, account-scoped actions cannot be automated from the cluster/workspace:
+  1. the **write deploy key** (public half) has not been added to the GitHub repo → Flux can't push tags back / authenticate the write `GitRepository`;
+  2. the **GHCR package is private** by default → the ImageRepository scan and the kubelet pull are denied.
+- **Fix (manual, in GitHub):**
+  1. Repo → Settings → **Deploy keys** → add the `flux-image-automation@ratlab` public key with **Allow write access**.
+  2. Package `ratlab-demo` → **Package settings → Change visibility → Public**.
+- **Verify:**
+  ```bash
+  kubectl -n flux-system get gitrepository flux-git-write   # READY True
+  kubectl -n flux-system get imagerepository ratlab-demo    # READY True
+  kubectl -n ratlab-demo rollout status deploy/ratlab-demo --timeout=90s
+  ```
+- **Lesson:** The reverse is also useful to know — until those steps are completed, `ImagePullBackOff` + `DENIED` are the **expected** state, not a manifest bug. Keep the two manual prerequisites in the runbook so a fresh setup doesn't chase a phantom.

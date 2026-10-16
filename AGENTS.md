@@ -12,7 +12,7 @@ every change is verified and documented.
 |---|---|
 | [`docs/roadmap.md`](docs/roadmap.md) | phases, **open decisions**, next actions |
 | [`docs/system-inventory.md`](docs/system-inventory.md) | verified host/cluster/workspace state |
-| [`docs/runbooks/`](docs/runbooks) | do-this procedures (01 install, 02 workspace, 03 session, 04 k9s, 05 GitOps/Flux, 06 observability, 07 Flux Web UI, 08 security hardening) |
+| [`docs/runbooks/`](docs/runbooks) | do-this procedures (01 install, 02 workspace, 03 session, 04 k9s, 05 GitOps/Flux, 06 observability, 07 Flux Web UI, 08 security hardening, 09 CI/CD + image automation) |
 | [`docs/adr/`](docs/adr) | *why* each decision was made |
 | [`docs/troubleshooting-log.md`](docs/troubleshooting-log.md) | every real failure: symptom → cause → fix → lesson |
 
@@ -71,6 +71,10 @@ State changes go in the docs (and `system-inventory.md`), not here.
   PSS `restricted` on app/infra namespaces (`monitoring` only is `privileged`,
   for node-exporter). See [ADR-0007](docs/adr/0007-security-hardening.md),
   [ADR-0008](docs/adr/0008-trivy-operator.md)
+- CI/CD: **GitHub Actions → GHCR** builds the `ratlab-demo` image (trivy + SBOM +
+  provenance); **Flux image automation** writes new tags back to git. See
+  [ADR-0009](docs/adr/0009-ci-cd-image-automation.md),
+  [runbook 09](docs/runbooks/09-ci-cd-image-automation.md)
 - Host: Fedora 44 Workstation · kubeconfig at `~/.kube/config` (host)
 
 ## Conventions
