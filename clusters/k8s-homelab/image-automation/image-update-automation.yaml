@@ -1,0 +1,30 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: fluxcdbot
+        email: fluxcdbot@users.noreply.github.com
+      messageTemplate: |
+        chore(image-automation): update ratlab-demo image
+
+        {{ range .Changed.Changes }}{{ . }}
+        {{ end }}
+    push:
+      branch: main
+      secretRef:
+        name: flux-git-write
+  update:
+    path: ./
+    strategy: Settle

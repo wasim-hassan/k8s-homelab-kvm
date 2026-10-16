@@ -3,4 +3,5 @@ kind: Kustomization
 resources:
   - infrastructure.yaml
   - flux-instance.yaml
+  - image-automation.yaml
   - apps.yaml
