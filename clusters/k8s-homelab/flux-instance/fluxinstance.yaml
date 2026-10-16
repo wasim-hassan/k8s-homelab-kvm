@@ -4,6 +4,19 @@ metadata:
   name: flux
   namespace: flux-system
 spec:
+  # PSS labels are applied declaratively to the flux-system namespace (and the
+  # Flux instance's own objects) by the operator, so they persist across
+  # reconciles and VM restarts. The namespace is Flux-Operator-owned, so the
+  # imperatively applied labels documented in ADR-0007 kept reverting.
+  # See docs/adr/0007-security-hardening.md and docs/runbooks/08-security-hardening.md.
+  commonMetadata:
+    labels:
+      pod-security.kubernetes.io/enforce: restricted
+      pod-security.kubernetes.io/enforce-version: latest
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: latest
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: latest
   distribution:
     version: "2.9.x"
     registry: "ghcr.io/fluxcd"
