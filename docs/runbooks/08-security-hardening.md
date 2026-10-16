@@ -23,7 +23,7 @@
   - `apps/podinfo/namespace.yaml`: `pod-security.kubernetes.io/enforce=restricted`, `warn=restricted`, `audit=restricted`.
   - `infrastructure/envoy-gateway/namespace.yaml`: same (restricted).
   - `infrastructure/monitoring/namespace.yaml`: `enforce=privileged`, `warn=baseline`, `audit=baseline` (node-exporter needs `hostNetwork`/`hostPID`/`hostPath`; other monitoring pods satisfy restricted).
-- `flux-system` is Flux Operator–owned. Operator sets `warn: restricted` (verified); enforce+audit applied imperatively: `kubectl label ns flux-system pod-security.kubernetes.io/enforce=restricted pod-security.kubernetes.io/enforce-version=latest pod-security.kubernetes.io/audit=restricted pod-security.kubernetes.io/audit-version=latest --overwrite`.
+- `flux-system` is Flux Operator–owned. The PSS labels are set **declaratively** via `FluxInstance.spec.commonMetadata.labels` (see §08) — **not** imperatively (that approach reverts; see §08). The operator re-applies them on every reconcile.
 - Dry-run/rollout: `flux reconcile kustomization apps --with-source` → `kubectl -n podinfo rollout status deploy/podinfo --timeout=60s` (OK). `flux reconcile kustomization infrastructure --with-source`. All pods in affected namespaces `Running`.
 - Verify PSS labels: `kubectl get ns -o custom-columns=NAME:.metadata.name,PSS-ENFORCE:.metadata.labels.pod-security\.kubernetes\.io/enforce,PSS-WARN:.metadata.labels.pod-security\.kubernetes\.io/warn,PSS-AUDIT:.metadata.labels.pod-security\.kubernetes\.io/audit`.
 

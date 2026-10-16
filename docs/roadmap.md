@@ -4,12 +4,12 @@ Forward plan for the homelab, phase by phase, with the decision points that
 block each phase. This is also the **resume point** for a new session: read the
 [Resume checklist](#resume-checklist) at the bottom.
 
-- **Last updated:** 2026-10-15
+- **Last updated:** 2026-10-16
 - **Done so far:** Phases 0–3 (substrate, k3s cluster, operator workspace + k9s,
   GitOps: Flux CD + SOPS/age, Envoy Gateway, first workload), Phase 5 (scripts),
   Phase 6 (observability), Phase 7 (security hardening), Phase 7b (Trivy Operator
   + Grafana dashboard) — see [system-inventory.md](system-inventory.md#current-phase-status).
-- **Last verified:** 2026-10-15
+- **Last verified:** 2026-10-16
 - **Done so far (verified):** substrate (KVM/libvirt/VMs), k3s cluster,
   Devpod workspace, k9s, GitOps (Flux + SOPS/age + Envoy Gateway + podinfo),
   the observability stack (kube-prometheus-stack), the **Flux Web UI**
@@ -24,14 +24,16 @@ block each phase. This is also the **resume point** for a new session: read the
   **done** 2026-10-15; Flux moved to operator-managed + Web UI **done** 2026-10-15
   ([runbook 07](runbooks/07-flux-webui.md)); Phase 7 (Security) **done**
   2026-10-15 ([runbook 08](runbooks/08-security-hardening.md)); Phase 7b (Trivy
-  Operator) **done** 2026-10-15 ([ADR-0008](adr/0008-trivy-operator.md)).
+  Operator) **done** 2026-10-16 ([ADR-0008](adr/0008-trivy-operator.md)).
 - **Remaining:** Phase 8 and the deferred/stretch items.
 
-### Next phase — Phase 7 (security hardening)
-- **Objective.** Add real security posture to the cluster without adding weight.
-- **Scope.** RBAC least-privilege for ServiceAccounts; Pod Security Standards
-  (`restricted` where feasible); audit that only SOPS-encrypted secrets live in
-  git. NetworkPolicy is deferred until a policy-capable CNI (Phase 4).
+### Next phase — Phase 8 (CI/CD + image automation)
+- **Objective.** Automate the build→ship path: turn a commit into a running
+  deployment, and keep image tags current without manual bumps.
+- **Scope.** Build images in CI (GitHub Actions), push to a registry (ghcr.io);
+  add the Flux **image-automation** controllers to write new image tags back to
+  git; wire `trivy image` + SBOM into the pipeline. End-to-end:
+  commit → CI builds → Flux deploys. Locked to `.devcontainer` tooling / FOSS only.
 
 > **Version note.** Component versions below were researched first, then
 > **pinned and verified in the cluster** at install time. Re-verify before
@@ -207,7 +209,7 @@ ship with the chart.
 
 ## Phase 7b — Continuous security scanning (Trivy Operator)
 
-> **Status: ✅ complete (2026-10-15).** Implemented in
+> **Status: ✅ complete (2026-10-16).** Implemented in
 > [`infrastructure/trivy-operator/`](../infrastructure/trivy-operator) +
 > [`infrastructure/monitoring/dashboards/`](../infrastructure/monitoring/dashboards).
 > Procedure + verification: [runbook 08](runbooks/08-security-hardening.md),
@@ -307,7 +309,7 @@ To pick this up in a new session:
    exception), secrets-hygiene audit clean. NetworkPolicy is deferred until
    Phase 4 (Cilium). See [runbook 08](runbooks/08-security-hardening.md),
    [ADR-0007](adr/0007-security-hardening.md).
-9. **Phase 7b done** (2026-10-15): **Trivy Operator** (chart 0.37.0) in
+9. **Phase 7b done** (2026-10-16): **Trivy Operator** (chart 0.37.0) in
    `trivy-system` for continuous image/config/secret/RBAC scanning, results in a
    **Grafana dashboard** (17813) at `grafana.local`; infra-assessment disabled to
    stay `restricted`; `flux-system` PSS labels made declarative. See

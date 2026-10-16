@@ -1016,7 +1016,7 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   ```
 - **Lesson:** A chart can be `Ready=True` (Helm applied fine) while the *workloads* it creates are blocked by Pod Security — a `HelmRelease` success is **not** proof the pods ran. Always `helm template` and inspect the rendered securityContexts before applying, and remember scan/child pods often take their security contexts from a **separate** chart key. Also note: PSS is enforced at pod **admission**, so the `FailedCreate` events persist against the **old** ReplicaSet even after the fix — check the *current* pods, not old events.
 
-## 2026-10-15 — `flux-system` PSS `enforce`/`audit` labels reverted after a restart (operator-owned namespace)
+## 2026-10-16 — `flux-system` PSS `enforce`/`audit` labels reverted after a restart (operator-owned namespace)
 
 - **Context:** Phase 7 set `pod-security.kubernetes.io/{enforce,audit}=restricted` on `flux-system` **imperatively** (`kubectl label`) and recorded it as an accepted exception ([ADR-0007](adr/0007-security-hardening.md)), because the namespace is Flux-Operator–owned. After a VM restart, `enforce`/`audit` were gone again.
 - **Symptom:**
@@ -1032,3 +1032,20 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   kubectl -n flux-system get fluxinstance flux -o jsonpath="{.status.conditions[?(@.type=='Ready')].reason}"
   ```
 - **Lesson:** For an operator-owned object, **never** manage a field imperatively — the operator will revert it. Put the desired state where the **operator** reads it (here, `FluxInstance.spec.commonMetadata`). "It stuck" after a manual `kubectl label` only means the operator had not reconciled yet.
+
+## 2026-10-16 — `flux-instance` Kustomization briefly `Ready=False` after a reconcile (`dependency 'flux-system/infrastructure' revision is not up to date`)
+
+- **Context:** After pushing a source (docs-only) change and reconciling, `flux get kustomizations -A` showed `flux-instance` `Ready=False` while `infrastructure` was already `Ready` at the **new** revision.
+- **Symptom:**
+  ```bash
+  flux get kustomizations -A
+  # flux-system  flux-instance  refs/heads/main@sha1:71c3d02...  False
+  #   dependency 'flux-system/infrastructure' revision is not up to date
+  ```
+- **Root cause:** `flux-instance` declares `dependsOn: infrastructure`. The `dependsOn` check is **revision-based**: on a new source revision each Kustomization reconciles independently, and `flux-instance` can be evaluated *after* the source updates but *before* `infrastructure` has re-applied the same revision. The message is a transient ordering artifact, not a drift or a config error.
+- **Fix:** Nudge the dependent so it re-evaluates: `flux reconcile kustomization flux-instance -n flux-system`. It then sees `infrastructure` at the matching revision and goes Ready.
+- **Verify:**
+  ```bash
+  flux get kustomizations -A   # all four: Ready=True at the same revision
+  ```
+- **Lesson:** A `dependency ... revision is not up to date` message that clears on its own (or after a nudge) is **not** a bug — don't "fix" the manifests for it. Only investigate if a Kustomization stays stuck at a **stale** revision while its dependency sits at a newer one.

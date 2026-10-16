@@ -36,7 +36,7 @@ Apply **Pod Security Standards (PSS)** per namespace:
 |---|---|---|
 | `DS-0026` | No HEALTHCHECK | `.devcontainer/Containerfile` builds an operator **workspace**, not a long-running service. |
 | `KSV-0020` / `KSV-0021` | UID/GID ≤ 10000 | podinfo runs as its image's own non-root user (uid 100/gid 101). PSS `restricted` requires non-root, not a UID > 10000; matching the image user avoids permission surprises. Enforced via numeric `runAsUser`/`runAsGroup`. |
-| `KSV-0125` | Untrusted registry | `ghcr.io` is GitHub's FOSS registry (trusted here); the check's default list is Docker Hub-centric. Image pinned `ghcr.io/stefanprodan/podinfo:6.7.1`. |
+| `KSV-0125` | Untrusted registry | `ghcr.io` is GitHub's FOSS registry (trusted here); the check's default list is Docker Hub-centric. Image pinned `ghcr.io/stefanprodan/podinfo` (was `6.7.1` here; since bumped to `6.15.0` in the Phase 7b findings triage — see [ADR-0008](0008-trivy-operator.md)). |
 
 ## References
 - [runbook 08](../runbooks/08-security-hardening.md) (execution details)

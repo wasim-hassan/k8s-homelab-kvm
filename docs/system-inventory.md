@@ -409,7 +409,7 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
   [ADR-0006](adr/0006-flux-operator-managed.md). Requires `192.168.123.11 flux.local`
   in the host `/etc/hosts` (manual, needs sudo).
 - **Phase 7 (Security hardening)** — done 2026-10-15: RBAC audit + least-privilege for `podinfo`, PSS applied (podinfo/envoy/flux-system `restricted`, monitoring `privileged` with documented node-exporter exception), trivy v0.75.0 pinned + checksum-verified in devcontainer, secrets hygiene audit (SOPS-only). NetworkPolicy waits on Phase 4 (Cilium). See [runbook 08](runbooks/08-security-hardening.md) and [ADR-0007](adr/0007-security-hardening.md). Phase 6 is complete — see [runbook 06](runbooks/06-observability.md).
-- **Phase 7b (Trivy Operator)** — done 2026-10-15: continuous in-cluster scanning (image/config/secret/RBAC) via the Trivy Operator, results in a Grafana dashboard; infra-assessment disabled to stay `restricted`. `flux-system` PSS labels moved from imperative to declarative (`FluxInstance.spec.commonMetadata`). See [ADR-0008](adr/0008-trivy-operator.md).
+- **Phase 7b (Trivy Operator)** — done 2026-10-16: continuous in-cluster scanning (image/config/secret/RBAC) via the Trivy Operator, results in a Grafana dashboard; infra-assessment disabled to stay `restricted`. `flux-system` PSS labels moved from imperative to declarative (`FluxInstance.spec.commonMetadata`); `podinfo` remediated to 6.15.0 (findings triage). See [ADR-0008](adr/0008-trivy-operator.md).
 
 ---
 
@@ -450,7 +450,7 @@ Verified 2026-10-15. See [ADR-0007](adr/0007-security-hardening.md) and [runbook
 
 ### Security scanning (Phase 7b — Trivy Operator)
 
-Verified 2026-10-15, reconciled at `main@sha1:5f6b164`. Continuous in-cluster
+Verified 2026-10-16, reconciled at `main@sha1:8c2d051`. Continuous in-cluster
 scanning; results rendered in Grafana (the "web UI"). See
 [ADR-0008](adr/0008-trivy-operator.md) and [runbook 08](runbooks/08-security-hardening.md).
 
@@ -479,7 +479,7 @@ platform upgrades and otherwise **accepted** (see [ADR-0008](adr/0008-trivy-oper
 
 ## GitOps state (Phase 3 — Flux CD, now operator-managed)
 
-Verified 2026-10-15, reconciled at `main@sha1:5f6b164`.
+Verified 2026-10-16, reconciled at `main@sha1:8c2d051`.
 
 | Item | Value |
 |---|---|

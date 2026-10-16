@@ -1,6 +1,6 @@
 # ADR-0008 — Continuous security scanning: Trivy Operator + Grafana dashboard
 
-- **Status:** Accepted (2026-10-15, Phase 7b)
+- **Status:** Accepted (2026-10-16, Phase 7b)
 - **Deciders:** project owner
 - **Context:** Phase 7 ([ADR-0007](0007-security-hardening.md)) adopted the
   **Trivy CLI** for one-shot manifest scanning in the workspace (`trivy config`,
