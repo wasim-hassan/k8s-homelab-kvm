@@ -7,7 +7,7 @@ spec:
   interval: 10m
   sourceRef:
     kind: GitRepository
-    name: flux-system
+    name: flux-git-write
   git:
     checkout:
       ref:
@@ -23,8 +23,6 @@ spec:
         {{ end }}
     push:
       branch: main
-      secretRef:
-        name: flux-git-write
   update:
     path: ./
     strategy: Settle

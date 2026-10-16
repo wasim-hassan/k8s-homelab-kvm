@@ -1,0 +1,12 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: flux-git-write
+  namespace: flux-system
+spec:
+  interval: 10m
+  url: ssh://git@github.com/wasim-hassan/k8s-homelab-kvm
+  ref:
+    branch: main
+  secretRef:
+    name: flux-git-write
