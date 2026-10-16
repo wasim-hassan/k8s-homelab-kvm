@@ -1,6 +1,6 @@
-# Runbook 08 — Phase 7: Security hardening (trivy, PSS, RBAC, secrets hygiene)
+# Runbook 08 — Phase 7 / 7b: Security hardening + continuous scanning (trivy, PSS, RBAC, Trivy Operator)
 
-**Goal:** Add a minimal, verifiable security posture to the cluster using a single FOSS scanner. Harden podinfo to `restricted`, enforce PSS on app/infra namespaces, apply least-privilege for podinfo, audit secrets, document exceptions.
+**Goal:** Add a minimal, verifiable security posture to the cluster using a single FOSS scanner. Harden podinfo to `restricted`, enforce PSS on app/infra namespaces, apply least-privilege for podinfo, audit secrets, document exceptions. **Phase 7b:** add the **Trivy Operator** for continuous in-cluster scanning and surface its results in Grafana (the "web UI").
 
 **Topology:** 2-node k3s (`k8s-cp-01` 192.168.123.11, `k8s-worker-01` 192.168.123.12), Devpod workspace, GitOps (Flux Operator + FluxInstance).
 
@@ -44,9 +44,34 @@
 - ADR-0007 written. Runbook 08 written. Update `docs/system-inventory.md` (Security Phase 7 section: RBAC matrix, PSS table, scanner). Update `docs/roadmap.md` (Phase 7 status → done or next steps noted), `docs/README.md`, `AGENTS.md` if index changes.
 - Commit: `feat(security): Phase 7 hardening (trivy, PSS, RBAC for podinfo)` + follow-up fix for numeric runAsUser. Push from host.
 
+## 07. Phase 7b — Trivy Operator (continuous scanning) + Grafana dashboard
+**Goal:** continuous, in-cluster scanning of running workloads, viewed in Grafana. See [ADR-0008](../adr/0008-trivy-operator.md). Trivy has no official web UI; the "UI" is a Grafana dashboard fed by the operator's Prometheus metrics.
+- **Manifests** ([`infrastructure/trivy-operator/`](../../infrastructure/trivy-operator)): `namespace.yaml` (`trivy-system`, PSS `restricted` ×3), `helmrepository.yaml` (`aqua`), `helmrelease.yaml` (chart **0.37.0**, app v0.35.0), `kustomization.yaml`. Wired into `infrastructure/kustomization.yaml`.
+- **Values that matter** (nesting is sharp — verify with `helm template`):
+  - top-level: `serviceMonitor.enabled` + `serviceMonitor.labels.release=kube-prometheus-stack`, `resources`, `podSecurityContext`, `securityContext`.
+  - `operator:` `scanJobsConcurrentLimit: 2`, `scanJobTimeout: 5m`, `metrics*Info: true`, **`infraAssessmentScannerEnabled: false`** (node-collector needs hostPath+root).
+  - `trivyOperator:` `scanJobPodTemplatePodSecurityContext` + `scanJobPodTemplateContainerSecurityContext` (numeric non-root uid 10000, RuntimeDefault, drop ALL, roFS).
+  - `trivy:` `mode: Standalone`, `ignoreUnfixed: true`, `imageScanCacheDir: /tmp/trivy/.cache`.
+- **Dashboard:** [`infrastructure/monitoring/dashboards/trivy-operator-dashboard.yaml`](../../infrastructure/monitoring/dashboards/trivy-operator-dashboard.yaml) — Grafana dashboard **17813**, `__inputs`/`__requires` stripped, `${DS_PROMETHEUS}` → `prometheus`, `ConfigMap` labelled `grafana_dashboard: "1"`, annotation `kustomize.toolkit.fluxcd.io/substitute: disabled`.
+- **Deploy:** commit → push → `flux reconcile source git flux-system` + `flux reconcile kustomization infrastructure --with-source`.
+- **Verify:**
+  - `kubectl -n trivy-system get helmrelease trivy-operator` → `Ready=True`, chart `0.37.0`.
+  - `kubectl -n trivy-system get pods` → operator `1/1 Running`.
+  - Reports appear: `kubectl get vulnerabilityreports,configauditreports,exposedsecretreports,rbacassessmentreports -A`.
+  - `kubectl get infraassessmentreports -A` → **0** (infra assessment disabled) and no node-collector jobs.
+  - Prometheus scrapes it: ServiceMonitor labelled `release=kube-prometheus-stack`; the active Prometheus scrape config contains `trivy-operator` targets.
+  - Grafana → *Trivy Operator Dashboard* (admin creds from the SOPS `grafana-admin` secret) at `http://grafana.local`.
+
+## 08. flux-system PSS labels — declarative (fix)
+- The `enforce`/`audit` labels applied imperatively in §03 **reverted after a VM restart** (namespace is Flux-Operator–owned).
+- Fix: add `spec.commonMetadata.labels` (the six PSS labels) to the `FluxInstance` ([`clusters/k8s-homelab/flux-instance/fluxinstance.yaml`](../../clusters/k8s-homelab/flux-instance/fluxinstance.yaml)). The operator re-applies them on every reconcile.
+- **Verify:** `kubectl get ns flux-system -o jsonpath="{.metadata.labels}"` → all six PSS labels present; `kubectl -n flux-system get fluxinstance flux` → `Ready=True`.
+
+
 ## Notes / exceptions
-- Flux-system namespace labels set imperatively (operator-owned, SSA/annotation `kustomize.toolkit.fluxcd.io/ssa: Ignore`). Documented in ADR-0007.
+- Flux-system namespace labels are now set **declaratively** via `FluxInstance.spec.commonMetadata.labels` (the earlier imperative approach reverted after a restart — see §08 and [ADR-0008](../adr/0008-trivy-operator.md)).
 - monitoring node-exporter exception: requires privileged; baseline warn/audit to surface gaps.
+- Trivy Operator (Phase 7b): infra-assessment/node-collector **disabled** (needs hostPath+root, incompatible with `restricted`) — image/config/secret/RBAC scans only. See [ADR-0008](../adr/0008-trivy-operator.md).
 - trivy 0.75.0 pinned (post malicious 0.69.4). Image/vuln/SBOM via `trivy image/fs` deferred to Phase 8.
 - Accepted deviations live in [`.trivyignore`](../../.trivyignore): `DS-0026` (no HEALTHCHECK — workspace image), `KSV-0020`/`KSV-0021` (podinfo UID/GID 100/101 — image's own non-root user), `KSV-0125` (ghcr.io registry — trusted here). Rationale in [ADR-0007](../adr/0007-security-hardening.md#accepted-deviations-trivyignore).
 - After acceptances `trivy config . --skip-dirs .git` reports **0 findings** (exit 0).

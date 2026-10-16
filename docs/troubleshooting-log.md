@@ -990,3 +990,45 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
   = `CreateContainerConfigError`. Always set a numeric `runAsUser` to make the
   non-root guarantee verifiable at admission time. Check the image's real UID
   (`kubectl exec ... -- id`) before enforcing `restricted`.
+
+---
+
+## 2026-10-15 — Trivy Operator scan jobs blocked by PSS `restricted` (`FailedCreate`)
+
+- **Context:** Deploying the Trivy Operator (Phase 7b, [ADR-0008](adr/0008-trivy-operator.md)) into `trivy-system`, which is PSS `restricted`. The `HelmRelease` went `Ready=True`, but **no scan jobs were created**.
+- **Symptom:**
+  ```bash
+  kubectl -n trivy-system get events --sort-by=.lastTimestamp | tail
+  # ... Error creating: pods "scan-vulnerabilityreport-..." is forbidden:
+  #     violates PodSecurity "restricted:latest":
+  #       runAsNonRoot != true (pod or container "trivy" must set securityContext.runAsNonRoot=true)
+  #       seccompProfile (pod or container "trivy" must set securityContext.seccompProfile.type to "RuntimeDefault" or "Localhost")
+  kubectl -n trivy-system get pods
+  # operator 1/1 Running  (scan jobs: none)
+  ```
+- **Root cause:** The Helm values were nested under the wrong keys. `podSecurityContext` / `securityContext` are **top-level** chart values, and the scan-job pods take theirs from `trivyOperator.scanJobPodTemplatePodSecurityContext` / `trivyOperator.scanJobPodTemplateContainerSecurityContext`. The initial values put the security contexts under `operator:`, which the chart ignored — so the operator pod and the scan-job template stayed unhardened. A dry render exposed it: `helm template trivy-operator aqua/trivy-operator` showed no `securityContext`.
+- **Fix:** Move the security contexts to the correct keys (top-level for the operator pod; under `trivyOperator:` for the scan-job template — numeric non-root uid 10000, `RuntimeDefault`, `drop: [ALL]`, `readOnlyRootFilesystem: true`). Commits `bc02584` (initial, wrong nesting) → `a81ad26` (fix).
+- **Verify:**
+  ```bash
+  kubectl -n trivy-system get pods                     # operator 1/1; scan jobs Running then Completed
+  kubectl get vulnerabilityreports,configauditreports -A
+  kubectl -n trivy-system get pod <scan-job> -o jsonpath="{.spec.containers[0].securityContext}"
+  ```
+- **Lesson:** A chart can be `Ready=True` (Helm applied fine) while the *workloads* it creates are blocked by Pod Security — a `HelmRelease` success is **not** proof the pods ran. Always `helm template` and inspect the rendered securityContexts before applying, and remember scan/child pods often take their security contexts from a **separate** chart key. Also note: PSS is enforced at pod **admission**, so the `FailedCreate` events persist against the **old** ReplicaSet even after the fix — check the *current* pods, not old events.
+
+## 2026-10-15 — `flux-system` PSS `enforce`/`audit` labels reverted after a restart (operator-owned namespace)
+
+- **Context:** Phase 7 set `pod-security.kubernetes.io/{enforce,audit}=restricted` on `flux-system` **imperatively** (`kubectl label`) and recorded it as an accepted exception ([ADR-0007](adr/0007-security-hardening.md)), because the namespace is Flux-Operator–owned. After a VM restart, `enforce`/`audit` were gone again.
+- **Symptom:**
+  ```bash
+  kubectl get ns flux-system -o jsonpath="{.metadata.labels}" | tr ',' '\n' | grep pod-security
+  # only pod-security.kubernetes.io/warn (+ warn-version) survived
+  ```
+- **Root cause:** The `flux-system` namespace is reconciled by the **Flux Operator** (`app.kubernetes.io/managed-by: flux-operator`, annotation `kustomize.toolkit.fluxcd.io/ssa: Ignore`). Imperative changes are **not** in the operator's desired state, so its reconcile reverts them. Only the operator's own label (`warn`) survived.
+- **Fix:** Set the six PSS labels **declaratively** via `FluxInstance.spec.commonMetadata.labels` ([`clusters/k8s-homelab/flux-instance/fluxinstance.yaml`](../clusters/k8s-homelab/flux-instance/fluxinstance.yaml)); the operator re-applies them on every reconcile.
+- **Verify:**
+  ```bash
+  kubectl get ns flux-system -o jsonpath="{.metadata.labels.pod-security\.kubernetes\.io/enforce}"   # restricted
+  kubectl -n flux-system get fluxinstance flux -o jsonpath="{.status.conditions[?(@.type=='Ready')].reason}"
+  ```
+- **Lesson:** For an operator-owned object, **never** manage a field imperatively — the operator will revert it. Put the desired state where the **operator** reads it (here, `FluxInstance.spec.commonMetadata`). "It stuck" after a manual `kubectl label` only means the operator had not reconciled yet.

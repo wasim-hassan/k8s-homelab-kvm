@@ -66,6 +66,11 @@ State changes go in the docs (and `system-inventory.md`), not here.
   via a `FluxInstance` since 2026-10-15; **Flux Status Web UI** at `flux.local`.
   See [ADR-0006](docs/adr/0006-flux-operator-managed.md) and
   [runbook 07](docs/runbooks/07-flux-webui.md)
+- Security: single scanner (**Trivy** CLI, Phase 7) plus continuous **in-cluster**
+  scanning via the **Trivy Operator** (chart `0.37.0`) with a Grafana dashboard;
+  PSS `restricted` on app/infra namespaces (`monitoring` only is `privileged`,
+  for node-exporter). See [ADR-0007](docs/adr/0007-security-hardening.md),
+  [ADR-0008](docs/adr/0008-trivy-operator.md)
 - Host: Fedora 44 Workstation · kubeconfig at `~/.kube/config` (host)
 
 ## Conventions

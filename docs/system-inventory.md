@@ -393,6 +393,8 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
 | 6 | Grafana exposed at `grafana.local` (HTTPRoute + ReferenceGrant), admin via SOPS secret | ✅ done |
 | 6 | Decision 4 (sizing) resolved — VMs bumped, stack fits under 65% per node | ✅ done |
 | 3 | Flux upgraded to **operator-managed** (Flux Operator 0.61.0 + FluxInstance) with the Flux Web UI at `flux.local` ([ADR-0006](adr/0006-flux-operator-managed.md), [runbook 07](runbooks/07-flux-webui.md)) | ✅ done |
+| 7 | Security hardening — trivy CLI, PSS, RBAC, secrets hygiene ([ADR-0007](adr/0007-security-hardening.md)) | ✅ done |
+| 7b | **Trivy Operator** + Grafana dashboard (continuous scanning); `flux-system` PSS labels made declarative ([ADR-0008](adr/0008-trivy-operator.md)) | ✅ done |
 
 ### Deferred / not yet done
 
@@ -407,6 +409,7 @@ v1.16.4, `k9s` v0.51.0, `yq` v4.54.1, `nvim` v0.12.6, `flux` v2.9.6,
   [ADR-0006](adr/0006-flux-operator-managed.md). Requires `192.168.123.11 flux.local`
   in the host `/etc/hosts` (manual, needs sudo).
 - **Phase 7 (Security hardening)** — done 2026-10-15: RBAC audit + least-privilege for `podinfo`, PSS applied (podinfo/envoy/flux-system `restricted`, monitoring `privileged` with documented node-exporter exception), trivy v0.75.0 pinned + checksum-verified in devcontainer, secrets hygiene audit (SOPS-only). NetworkPolicy waits on Phase 4 (Cilium). See [runbook 08](runbooks/08-security-hardening.md) and [ADR-0007](adr/0007-security-hardening.md). Phase 6 is complete — see [runbook 06](runbooks/06-observability.md).
+- **Phase 7b (Trivy Operator)** — done 2026-10-15: continuous in-cluster scanning (image/config/secret/RBAC) via the Trivy Operator, results in a Grafana dashboard; infra-assessment disabled to stay `restricted`. `flux-system` PSS labels moved from imperative to declarative (`FluxInstance.spec.commonMetadata`). See [ADR-0008](adr/0008-trivy-operator.md).
 
 ---
 
@@ -435,7 +438,8 @@ Verified 2026-10-15. See [ADR-0007](adr/0007-security-hardening.md) and [runbook
 |---|---|---|---|
 | `podinfo` | **restricted** | restricted | Deployment hardened (runAsNonRoot, numeric uid 100, RuntimeDefault seccomp, drop ALL, no priv-esc, read-only rootfs) |
 | `envoy-gateway-system` | **restricted** | restricted | Verified: no hostPort/hostNetwork; only configMap/secret/emptyDir/projected volumes |
-| `flux-system` | **restricted** | restricted | **Applied imperatively** (namespace is Flux Operator–owned; see ADR-0007) |
+| `flux-system` | **restricted** | restricted | Set **declaratively** via `FluxInstance.spec.commonMetadata.labels` (operator re-applies every reconcile; [ADR-0008](adr/0008-trivy-operator.md)) |
+| `trivy-system` | **restricted** | restricted | Trivy Operator + unprivileged scan jobs (numeric non-root uid 10000, RuntimeDefault, drop ALL, roFS) |
 | `monitoring` | **privileged** | baseline | node-exporter needs `hostNetwork`+`hostPID`+`hostPath` — documented exception; other monitoring pods satisfy restricted |
 | `default`, `kube-public`, `kube-node-lease` | — | — | No workloads / system-managed |
 | `kube-system` | — | — | System-managed (k3s) |
@@ -444,11 +448,30 @@ Verified 2026-10-15. See [ADR-0007](adr/0007-security-hardening.md) and [runbook
 
 **Not done here:** NetworkPolicy — deferred until a policy-capable CNI (Phase 4/Cilium).
 
+### Security scanning (Phase 7b — Trivy Operator)
+
+Verified 2026-10-15, reconciled at `main@sha1:5f6b164`. Continuous in-cluster
+scanning; results rendered in Grafana (the "web UI"). See
+[ADR-0008](adr/0008-trivy-operator.md) and [runbook 08](runbooks/08-security-hardening.md).
+
+| Item | Value |
+|---|---|
+| Component | **Trivy Operator** (chart **0.37.0**, app **v0.35.0**) via `HelmRelease` in `trivy-system` |
+| Source | `HelmRepository aqua` → `https://aquasecurity.github.io/helm-charts` |
+| Images | operator `mirror.gcr.io/aquasec/trivy-operator:0.35.0` (uid 10000); scan jobs `mirror.gcr.io/aquasec/trivy` (forced non-root) |
+| Mode | `trivy.mode: Standalone` — no server, no PVC (each job pulls the DB to its `/tmp` emptyDir) |
+| Scans | image CVE, config-audit, exposed-secret, RBAC (+ cluster-RBAC) |
+| Disabled | **infra-assessment / node-collector** (`infraAssessmentScannerEnabled: false`) — needs hostPath+root, incompatible with `restricted` |
+| Reports (CRs) | `vulnerabilityreports` 20 · `configauditreports` 41 · `exposedsecretreports` 20 · `rbacassessmentreports` 12 · `clusterrbacassessmentreports` 97 · `infraassessmentreports` 0 |
+| Metrics | info metrics enabled (`metricsExposedSecretInfo`, `metricsRbacAssessmentInfo`, `metricsClusterComplianceInfo`, `metricsConfigAuditInfo`); ServiceMonitor `release=kube-prometheus-stack` |
+| Dashboard | Grafana **17813** "Trivy Operator Dashboard" as a `ConfigMap` (`grafana_dashboard=1`) in `infrastructure/monitoring/dashboards/` |
+| Manifests | [`../infrastructure/trivy-operator/`](../infrastructure/trivy-operator), [`../infrastructure/monitoring/dashboards/`](../infrastructure/monitoring/dashboards) |
+
 ---
 
 ## GitOps state (Phase 3 — Flux CD, now operator-managed)
 
-Verified 2026-10-15, reconciled at `main@sha1:ab1ef60`.
+Verified 2026-10-15, reconciled at `main@sha1:5f6b164`.
 
 | Item | Value |
 |---|---|
@@ -518,6 +541,6 @@ Verified 2026-10-15, reconciled at `main@sha1:e535a647`.
 | k3s control-plane monitors | et **disabled** — `kubeEtcd`/`kubeControllerManager`/`kubeScheduler`/`kubeProxy` off (k3s uses SQLite and embeds the control plane; no endpoints) |
 | Targets | 15 active, **15 up** |
 | ServiceMonitors | 8 |
-| Dashboards | 24 provisioned ConfigMaps (`grafana_dashboard=1`) |
+| Dashboards | 25 provisioned ConfigMaps (`grafana_dashboard=1`) — 24 from the chart + **Trivy Operator Dashboard** (17813, Phase 7b) |
 | Secret | SOPS-encrypted `grafana-admin` (`admin-user` / `admin-password`) |
 | Manifests | [`../infrastructure/monitoring/`](../infrastructure/monitoring) |

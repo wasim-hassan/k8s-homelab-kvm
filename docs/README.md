@@ -3,10 +3,12 @@
 A 2-node k3s homelab on libvirt/KVM, with the operator toolchain in a FOSS-only
 Devpod (Podman) workspace. This index links every document.
 
-Current phase: **6 complete** (Phases 0–3, 5–6: k3s, workspace, k9s, GitOps with
-Flux/SOPS, and the observability stack), plus the **Flux Web UI** (Flux migrated
-to the Flux Operator). **Phase 7 (security hardening) is next.** See the
-[roadmap](roadmap.md) for the forward plan and decisions.
+Current phase: **7 complete** (Phases 0–3, 5–7: k3s, workspace, k9s, GitOps with
+Flux/SOPS, the observability stack, and security hardening), plus the **Flux Web
+UI** (Flux migrated to the Flux Operator) and **Phase 7b** — the **Trivy Operator**
+for continuous scanning with a Grafana dashboard. **Phase 8 (CI/CD + image
+automation) is next.** See the [roadmap](roadmap.md) for the forward plan and
+decisions.
 
 ---
 
@@ -21,7 +23,7 @@ to the Flux Operator). **Phase 7 (security hardening) is next.** See the
 | 05 | [GitOps with Flux CD](runbooks/05-gitops-flux.md) | Flux bootstrap, SOPS/age, Envoy Gateway, podinfo workload |
 | 06 | [Observability](runbooks/06-observability.md) | kube-prometheus-stack via Flux, Grafana route, Prometheus targets |
 | 07 | [Flux Web UI](runbooks/07-flux-webui.md) | migrate Flux to the Flux Operator, Flux Status UI at `flux.local` |
-| 08 | [Security hardening](runbooks/08-security-hardening.md) | trivy scanner, PSS per namespace, RBAC, secrets hygiene |
+| 08 | [Security hardening](runbooks/08-security-hardening.md) | trivy, PSS, RBAC, secrets hygiene + Trivy Operator (Phase 7b) |
 
 ## ADRs (why)
 
@@ -34,13 +36,14 @@ to the Flux Operator). **Phase 7 (security hardening) is next.** See the
 | 0005 | [No Ansible — node config stays scripted](adr/0005-no-ansible-node-config.md) *(accepted)* |
 | 0006 | [Flux managed by the Flux Operator (Web UI)](adr/0006-flux-operator-managed.md) *(accepted)* |
 | 0007 | [Security hardening (trivy, PSS, RBAC)](adr/0007-security-hardening.md) *(accepted)* |
+| 0008 | [Continuous scanning — Trivy Operator + Grafana](adr/0008-trivy-operator.md) *(accepted)* |
 
 ## Reference
 
 | Doc | What |
 |---|---|
 | [System inventory](system-inventory.md) | verified host + cluster + workspace state |
-| [Roadmap](roadmap.md) | phase plan (remaining: 7–8) + decision log |
+| [Roadmap](roadmap.md) | phase plan (remaining: 8) + decision log |
 | [Troubleshooting log](troubleshooting-log.md) | every real failure: symptom → cause → fix → lesson |
 
 ## Code / config
@@ -53,7 +56,7 @@ to the Flux Operator). **Phase 7 (security hardening) is next.** See the
 | [`../ansible/`](../ansible) | dropped — node config stays scripted ([ADR-0005](adr/0005-no-ansible-node-config.md)) |
 | [`../config/k9s/`](../config/k9s) | k9s config, hotkeys, gruvbox skin (mounted via `K9S_CONFIG_DIR`) |
 | [`../clusters/`](../clusters) | Flux app-of-apps (`clusters/k8s-homelab/`) |
-| [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring, Flux Operator) |
+| [`../infrastructure/`](../infrastructure) | cluster controllers as git-managed manifests (Envoy Gateway, monitoring, Flux Operator, Trivy Operator) |
 | [`../apps/`](../apps) | workloads (podinfo) with encrypted secrets |
 | [`../.devcontainer/`](../.devcontainer) | `Containerfile` + `devcontainer.json` |
 

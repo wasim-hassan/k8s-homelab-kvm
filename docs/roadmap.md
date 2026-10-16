@@ -7,21 +7,24 @@ block each phase. This is also the **resume point** for a new session: read the
 - **Last updated:** 2026-10-15
 - **Done so far:** Phases 0–3 (substrate, k3s cluster, operator workspace + k9s,
   GitOps: Flux CD + SOPS/age, Envoy Gateway, first workload), Phase 5 (scripts),
-  Phase 6 (observability), Phase 7 (security hardening) — see
-  [system-inventory.md](system-inventory.md#current-phase-status).
+  Phase 6 (observability), Phase 7 (security hardening), Phase 7b (Trivy Operator
+  + Grafana dashboard) — see [system-inventory.md](system-inventory.md#current-phase-status).
 - **Last verified:** 2026-10-15
 - **Done so far (verified):** substrate (KVM/libvirt/VMs), k3s cluster,
   Devpod workspace, k9s, GitOps (Flux + SOPS/age + Envoy Gateway + podinfo),
   the observability stack (kube-prometheus-stack), the **Flux Web UI**
   (Flux migrated to the **Flux Operator**, [ADR-0006](adr/0006-flux-operator-managed.md)),
-  and **Phase 7 security hardening** (trivy, PSS, RBAC, secrets hygiene,
-  [ADR-0007](adr/0007-security-hardening.md)).
+  **Phase 7 security hardening** (trivy, PSS, RBAC, secrets hygiene,
+  [ADR-0007](adr/0007-security-hardening.md)), and **Phase 7b** — the
+  **Trivy Operator** for continuous in-cluster scanning with a Grafana dashboard
+  ([ADR-0008](adr/0008-trivy-operator.md)).
 - **Current focus:** Phase 8 (CI/CD + image automation).
   Phase 3 (GitOps) done 2026-10-14; Phase 5 (IaC) re-scoped 2026-10-15
   ([ADR-0005](adr/0005-no-ansible-node-config.md)); Phase 6 (Observability)
   **done** 2026-10-15; Flux moved to operator-managed + Web UI **done** 2026-10-15
   ([runbook 07](runbooks/07-flux-webui.md)); Phase 7 (Security) **done**
-  2026-10-15 ([runbook 08](runbooks/08-security-hardening.md)).
+  2026-10-15 ([runbook 08](runbooks/08-security-hardening.md)); Phase 7b (Trivy
+  Operator) **done** 2026-10-15 ([ADR-0008](adr/0008-trivy-operator.md)).
 - **Remaining:** Phase 8 and the deferred/stretch items.
 
 ### Next phase — Phase 7 (security hardening)
@@ -48,6 +51,7 @@ block each phase. This is also the **resume point** for a new session: read the
 | 5 | IaC — kept as scripts; **Ansible dropped, Terraform deferred** ([ADR-0005](adr/0005-no-ansible-node-config.md)) | ➖ re-scoped | — |
 | 6 | Observability stack (Prometheus + Grafana; Alertmanager off) | ✅ done | — |
 | 7 | Security hardening (RBAC, PSS, secrets hygiene; NetworkPolicy deferred) | ✅ done | — (NetworkPolicy → Phase 4) |
+| 7b | Continuous security scanning (Trivy Operator + Grafana dashboard) | ✅ done | — |
 | 8 | CI/CD + image automation | ⏳ | — (Phase 3 done) |
 | — | Stretch: Talos, storage (Longhorn), backup (Velero) | 💤 later | — |
 
@@ -201,6 +205,31 @@ ship with the chart.
 
 ---
 
+## Phase 7b — Continuous security scanning (Trivy Operator)
+
+> **Status: ✅ complete (2026-10-15).** Implemented in
+> [`infrastructure/trivy-operator/`](../infrastructure/trivy-operator) +
+> [`infrastructure/monitoring/dashboards/`](../infrastructure/monitoring/dashboards).
+> Procedure + verification: [runbook 08](runbooks/08-security-hardening.md),
+> [ADR-0008](adr/0008-trivy-operator.md).
+
+**Goal:** extend Phase 7's one-shot CLI scanning to **continuous, in-cluster**
+scanning — and provide the requested "trivy web UI" without adding a bespoke app.
+
+- **Trivy Operator** (chart **0.37.0**, app v0.35.0) via a Flux `HelmRelease` in
+  the new `trivy-system` namespace (PSS `restricted`). Standalone mode — no
+  server, no PVC. Scans image CVE, config-audit, exposed-secret and RBAC.
+- **"Web UI" = Grafana.** The operator emits Prometheus metrics; dashboard
+  **17813** is vendored as a `ConfigMap` (`grafana_dashboard=1`) that the Grafana
+  sidecar provisions. No bespoke UI is added. **Trivy has no official server UI.**
+- **Scope kept `restricted`:** infra-assessment / node-collector **disabled**
+  (needs hostPath+root); scan jobs run as unprivileged non-root (uid 10000).
+- **Bonus fix:** the `flux-system` PSS `enforce`/`audit` labels, previously set
+  imperatively and reverted after a restart, are now **declarative** via
+  `FluxInstance.spec.commonMetadata.labels`.
+
+---
+
 ## Phase 8 — CI/CD + image automation
 
 - Build container images in CI (GitHub Actions or self-hosted runner), push to a
@@ -233,6 +262,7 @@ repo's memory is complete.
 | 5 | Config management (Ansible?) | **No Ansible** — keep `10-prepare-nodes.sh`; Terraform-libvirt deferred (redundant with the external provisioner); Talos is the long-term replacement. [ADR-0005](adr/0005-no-ansible-node-config.md). |
 | 6 | Flux status / Web UI | **Flux Web UI via the Flux Operator** — migrate Flux to operator-managed (`FluxInstance`) and expose the Flux Status UI at `flux.local`. Weave GitOps ruled out (unmaintained + breaks on HelmRelease `v2`); `fluxcd/webui` archived. [ADR-0006](adr/0006-flux-operator-managed.md), [runbook 07](runbooks/07-flux-webui.md). |
 | 7 | Security scanner (kube-linter vs trivy) | **Trivy v0.75.0, single scanner** — kube-linter only lints manifests and cannot do image CVE / secrets / SBOM, so it cannot cover Phase 8; trivy's `config` mode replaces kube-linter and its image/secret/SBOM modes cover the rest. Pinned ≥ 0.75.0 (avoid malicious `0.69.4`). [ADR-0007](adr/0007-security-hardening.md). |
+| 8 | Trivy Web UI / continuous scanning | **Trivy Operator + Grafana dashboard.** Trivy has no official server web UI; the operator scans in-cluster (image/config/secret/RBAC) and exposes Prometheus metrics, rendered by a vendored Grafana dashboard (17813). No bespoke UI, kept `restricted` by disabling infra-assessment. [ADR-0008](adr/0008-trivy-operator.md). |
 
 The option tables for decisions 1–3 are preserved in git history; the
 resolutions above supersede them.
@@ -252,7 +282,7 @@ To pick this up in a new session:
 
 1. Start the environment — [runbook 03](runbooks/03-session-lifecycle.md)
    (`kvm on` → `vm start k8s-cp-01` → `vm start k8s-worker-01` → `devpod up . --ide none`).
-2. Decisions **1–7** are all resolved ([above](#resolved-decisions)).
+2. Decisions **1–8** are all resolved ([above](#resolved-decisions)).
 3. Git checkpoint is **done** — repo initialized, committed, pushed to private
    GitHub, so Flux diffs will be legible.
 4. Phase 3 **done** (2026-10-14): Flux bootstrapped, `sops-age` wired, Envoy
@@ -273,7 +303,12 @@ To pick this up in a new session:
    exception), secrets-hygiene audit clean. NetworkPolicy is deferred until
    Phase 4 (Cilium). See [runbook 08](runbooks/08-security-hardening.md),
    [ADR-0007](adr/0007-security-hardening.md).
-9. **Next: Phase 8 (CI/CD + image automation)** — build images in CI, push to a
+9. **Phase 7b done** (2026-10-15): **Trivy Operator** (chart 0.37.0) in
+   `trivy-system` for continuous image/config/secret/RBAC scanning, results in a
+   **Grafana dashboard** (17813) at `grafana.local`; infra-assessment disabled to
+   stay `restricted`; `flux-system` PSS labels made declarative. See
+   [ADR-0008](adr/0008-trivy-operator.md).
+10. **Next: Phase 8 (CI/CD + image automation)** — build images in CI, push to a
    registry, Flux image automation, and wire `trivy image`/SBOM into the pipeline.
 
 ---
