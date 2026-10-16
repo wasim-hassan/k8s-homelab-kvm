@@ -87,12 +87,22 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
 
-      - name: Upload Trivy SARIF
+      - name: Upload Trivy SARIF (code scanning)
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
           category: trivy-image
+
+      - name: Upload scan artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-sarif
+          path: trivy-results.sarif
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Generate SBOM (syft)
         if: github.event_name != 'pull_request'
