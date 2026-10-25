@@ -10,7 +10,7 @@
 
 - Source: [`images/ratlab-demo/`](../../images/ratlab-demo) — `main.go`, `go.mod`, `Containerfile`.
 - Endpoints: `/` (version + hostname), `/version` (JSON), `/healthz`, `/readyz`. Env: `PORT` (default `8080`).
-- `Containerfile`: `golang:1.23-alpine` build → `scratch`, static binary, `USER 65532:65532`, `EXPOSE 8080`. Single `linux/amd64` platform.
+- `Containerfile`: `golang:1.25-alpine` build → `scratch`, static binary, `USER 65532:65532`, `EXPOSE 8080`. Single `linux/amd64` platform.
 - Version is injected at build: `-ldflags "-X main.version=<tag>"` via the build `ARG VERSION`.
 
 ## 02. CI workflow — GitHub Actions → GHCR
@@ -82,7 +82,7 @@ kubectl -n ratlab-demo get pods
 kubectl -n ratlab-demo rollout status deploy/ratlab-demo --timeout=90s
 ```
 
-- **Cut a release:** `git tag -a v0.1.3 -m 'ratlab-demo v0.1.3' && git push origin v0.1.3` (bump the number each time). CI builds/pushes; `ImagePolicy` resolves the new semver on its next scan (≤5m); `ImageUpdateAutomation` commits an updated tag to `main`; the `apps` Kustomization rolls it out. No manual YAML edit. Verified hands-off for `v0.1.1`→`v0.1.3`.
+- **Cut a release:** `git tag -a v0.1.3 -m 'ratlab-demo v0.1.3' && git push origin v0.1.3` (bump the number each time). CI builds/pushes; `ImagePolicy` resolves the new semver on its next scan (≤5m); `ImageUpdateAutomation` commits an updated tag to `main`; the `apps` Kustomization rolls it out. No manual YAML edit. Verified hands-off for `v0.1.1`→`v0.1.4`.
 - App is reachable at `http://ratlab-demo.local` (host `/etc/hosts` → `192.168.123.11`).
 
 ## 06. Docs + commit

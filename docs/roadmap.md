@@ -4,8 +4,8 @@ Forward plan for the homelab, phase by phase, with the decision points that bloc
 each phase. This is also the resume point for a new session: read the
 [Resume checklist](#resume-checklist) at the bottom.
 
-- **Last updated:** 2026-10-16
-- **Last verified:** 2026-10-16
+- **Last updated:** 2026-10-25
+- **Last verified:** 2026-10-25
 - **Status:** all planned phases (0 through 8) are complete. The current focus is
   maintenance and the deferred, stretch items (Talos, storage, backup).
 - **Built:** the substrate (KVM/libvirt, VMs), the k3s cluster, the operator

@@ -21,7 +21,7 @@ automation** write new tags back to git.
 
 - A tiny FOSS **Go** HTTP server ([`images/ratlab-demo/`](../../images/ratlab-demo))
   exposing `/` (version + hostname), `/version` (JSON), `/healthz`, `/readyz`.
-- Multi-stage build: `golang:1.23-alpine` → **`scratch`**, static binary, `USER
+- Multi-stage build: `golang:1.25-alpine` → **`scratch`**, static binary, `USER
   65532:65532`, single `linux/amd64` platform. Minimal attack surface and
   trivially PSS-`restricted`-compliant (matches the Phase 7 posture).
 - Deployed as `apps/ratlab-demo` (Deployment/Service/HTTPRoute), routed at

@@ -1219,3 +1219,25 @@ kubectl run dns --rm -it --image=busybox:1.36.1 --restart=Never -- \
 - **Root cause:** GitHub's REST API for Packages supports **get / delete / restore / list versions** but has **no endpoint to change a package's visibility**. It is a long-standing gap (confirmed by GitHub docs and community reports).
 - **Fix:** change it once in the web UI: `https://github.com/users/<user>/packages/container/<image>/settings` → *Danger Zone → Change visibility → Public*. (Or keep the package private and wire a `dockerconfigjson` pull secret into both the `ImageRepository` and the workload.)
 - **Lesson:** some GHCR settings are UI-only. When automating, plan for a small, documented manual step; don't assume everything under a resource has a REST endpoint.
+
+## 2026-10-25 — Trivy Operator scans fail with `BackoffLimitExceeded` on multi-container images
+
+- **Context:** After a node reboot, `kubectl get events -A` showed repeated `BackoffLimitExceeded` for `scan-vulnerabilityreport-*` Jobs in `trivy-system`.
+- **Symptom:**
+
+  ```text
+  ERROR Failed to acquire cache or database lock ...
+  FATAL run error: image scan error: ... cache may be in use by another process: timeout
+  ```
+
+- **Root cause:** Trivy Operator names one scan container per container in the target pod and runs them in parallel. Multi-container workloads (Grafana has four, Envoy two) therefore run several Trivy processes against the **same cache directory**, and they contend on the Trivy cache lock.
+- **Fix / resolution:** none required. The operator retries and the `VulnerabilityReport` is still produced with data (verify with `kubectl get vulnerabilityreports -A`). The events are noisy, not a lost scan.
+- **Lesson:** a `BackoffLimitExceeded` event on a scan Job is not automatically a broken scanner. Check whether the corresponding `VulnerabilityReport` has a populated `.report.summary` before changing controller settings.
+
+## 2026-10-25 — Running image carried a Critical CVE from the Go 1.23 toolchain
+
+- **Context:** Post-reboot Trivy reports showed `ratlab-demo` at 1 Critical / 6 High, despite an earlier "0 Critical" state.
+- **Symptom:** `CVE-2025-68121` in **Go stdlib `v1.23.12`**, fixed in `1.24.13`, `1.25.7`, `1.26.0-rc.3`.
+- **Root cause:** the image was built from `golang:1.23-alpine`; the Go runtime is compiled into the static binary, so the stale toolchain ships inside an otherwise `scratch` image.
+- **Fix:** merged the Dependabot bump to `golang:1.25-alpine`, then cut **`v0.1.4`**. Merging alone only produces `main`/`sha`/`latest` tags, which the semver `ImagePolicy` ignores; a **`vX.Y.Z` tag** is what triggers the image-automation loop. Result: `ImagePolicy` → `0.1.4`, Flux committed `d9e8ebd`, the pod rolled out, and the new report is **0 Critical / 0 High / 0 Medium**.
+- **Lesson:** rebuilding an image does not redeploy it. With semver-driven image automation, a fix only ships when you **cut a release tag**.

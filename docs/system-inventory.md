@@ -3,7 +3,7 @@
 Verified state of the host and cluster. Every value below was confirmed by running
 the command shown, not assumed.
 
-Last verified: 2026-10-16
+Last verified: 2026-10-25
 
 ---
 
@@ -505,24 +505,28 @@ Added 2026-10-16. See [ADR-0009](adr/0009-ci-cd-image-automation.md) and
 | Tag convention | release-driven: only `vX.Y.Z` tags match the `ImagePolicy` (main pushes produce unmatched `sha`/`latest`) |
 | Manual prerequisites | ✅ done — (1) write deploy key `flux-image-automation` added (read-write); (2) GHCR package `ratlab-demo` set **public** |
 
-**Verified end-to-end (2026-10-16).** image ref+automation controllers
-`1/1 Running`; CRDs `imagerepositories/imagepolicies/imageupdateautomations`
-present. Both one-time GitHub steps are done: the **write deploy key** is added
+**Verified end-to-end (2026-10-16, extended 2026-10-25).** image
+ref+automation controllers `1/1 Running`; CRDs
+`imagerepositories/imagepolicies/imageupdateautomations` present. Both one-time
+GitHub steps are done: the **write deploy key** is added
 (`GitRepository/flux-git-write` `Ready=True`) and the **GHCR package is public**
 (`ImageRepository` `Ready`, scans every 5m). The loop was observed fully
-**hands-off** across three releases (`v0.1.1` → `v0.1.2` → `v0.1.3`): on each
-tag `ImagePolicy` resolved the new semver on its own interval,
+**hands-off** across four releases (`v0.1.1` → `v0.1.4`): on each tag
+`ImagePolicy` resolved the new semver on its own interval,
 `ImageUpdateAutomation` committed the tag bump to `main`, and the `apps`
-Kustomization rolled it out — no manual edit. Final state: `ImagePolicy` →
-**`0.1.3`**, commit **`2478343 chore(image-automation): update ratlab-demo
-image`**, pod **`1/1 Running`** on `ghcr.io/wasim-hassan/ratlab-demo:0.1.3`;
-`curl http://ratlab-demo.local/version` returns `{"version":"0.1.3",...}`.
+Kustomization rolled it out — no manual edit. Final state (2026-10-25):
+`ImagePolicy` → **`0.1.4`**, commit **`d9e8ebd chore(image-automation): update
+ratlab-demo image`**, pod `1/1 Running` on
+`ghcr.io/wasim-hassan/ratlab-demo:0.1.4`; `curl
+http://ratlab-demo.local/version` returns `{"version":"0.1.4",...}`. `v0.1.4`
+rebuilds on **Go 1.25**, clearing `CVE-2025-68121` (report: 0 critical / 0 high
+/ 0 medium).
 
 ---
 
 ## GitOps state (Phase 3 — Flux CD, now operator-managed)
 
-Verified 2026-10-16, reconciled at `main@sha1:2478343`.
+Verified 2026-10-25, reconciled at `main@sha1:d9e8ebd`.
 
 | Item | Value |
 |---|---|
