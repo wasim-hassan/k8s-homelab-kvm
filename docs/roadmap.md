@@ -261,6 +261,10 @@ scanning — and provide the requested "trivy web UI" without adding a bespoke a
   already satisfied — see [ADR-0002](adr/0002-implicit-cpu-model.md).
 - **Persistent storage:** Longhorn or tune `local-path-provisioner`.
 - **Backup:** Velero for cluster/volume backup; etcd snapshots (k3s).
+- **Tooling evaluation:** a surveyed radar of candidate tools (IaC, GitOps,
+  service mesh, policy, appsec, observability, chaos, autoscaling) with FOSS
+  license, footprint, and verdicts — see
+  [tooling-evaluation.md](tooling-evaluation.md).
 
 ---
 

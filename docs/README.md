@@ -47,6 +47,7 @@ One short record per non-trivial decision.
 |---|---|
 | [System inventory](system-inventory.md) | The verified state of the host, cluster, and workspace |
 | [Roadmap](roadmap.md) | Phase plan, decision log, and deferred work |
+| [Tooling evaluation](tooling-evaluation.md) | Candidate tools, licenses, footprint, and verdicts |
 | [Troubleshooting log](troubleshooting-log.md) | Every real failure: symptom, cause, fix, lesson |
 
 ## Code and configuration
