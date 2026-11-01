@@ -8,12 +8,6 @@
 *.agekey
 keys.txt
 
-# terraform (Phase 5)
-*.tfstate
-*.tfstate.*
-.terraform/
-.terraform.lock.hcl
-
 # local libvirt network backups
 *.backup.xml
 

@@ -65,17 +65,6 @@ only ships Terraform.
 *Don't use it here:* the lab is FOSS-only and the VMs are created by the
 external `kvm-vm-provisioner` (see [ADR-0005](adr/0005-no-ansible-node-config.md)).
 
-### OpenTofu — 🔬 (defer install)
-
-The Linux Foundation fork of Terraform 1.5.x, **MPL 2.0**, with built-in
-client-side state encryption and its own registry. It is the drop-in
-replacement for the Terraform workflow.
-
-*Use it when:* you want IaC for the host/VM/network layer without the BUSL.
-*Don't use it here yet:* it would duplicate the external provisioner this
-project must not modify. It is the right answer **if** the host layer is ever
-brought in-repo.
-
 ### Pulumi — ⏳ (CLI only) / ❌ (as a platform)
 
 Provisioning in general-purpose languages (TypeScript, Python, Go). The **CLI
@@ -85,7 +74,7 @@ fully FOSS workflow is possible).
 
 *Use it when:* you want real programming constructs (loops, tests, packages) in
 infrastructure code.
-*Don't use it here:* it solves the same problem as OpenTofu with a heavier
+*Don't use it here:* it solves similar IaC problems with a heavier
 learning curve, and the hosted product is proprietary.
 
 ### Crossplane — ⏳
@@ -377,7 +366,7 @@ Ordered by value and RAM cost. Each step should be its own ADR + runbook.
 | 8 | **Chaos Mesh** *or* **Litmus one-shot** | Failure injection | ~300–500 MiB / ~0 | RAM bump likely |
 | 9 | **Velero** | Backup and restore | ~100–200 MiB + storage | an S3-compatible target |
 
-**Study-only (no install):** Terraform vs OpenTofu, Pulumi, Crossplane, Argo CD,
+**Study-only (no install):** Pulumi, Crossplane, Argo CD,
 Istio ambient, Cilium, Kubeflow, SonarQube.
 
 **CI-side (zero cluster cost):** Semgrep, Grype, OWASP Dependency-Check, OWASP
@@ -387,9 +376,6 @@ ZAP baseline, Cosign.
 
 | Tool | Theme | License | Est. RAM | Overlaps with | Verdict |
 |---|---|---|---|---|---|
-| Terraform | IaC | BUSL 1.1 | n/a (CLI) | OpenTofu | ❌ |
-| OpenTofu | IaC | MPL 2.0 | n/a (CLI) | Terraform | 🔬 |
-| Pulumi | IaC | Apache 2.0 (CLI) | n/a (CLI) | OpenTofu | ⏳ |
 | Crossplane | IaC | Apache 2.0 | ~150–300 MiB | Flux | ⏳ |
 | Kustomize | Config | Apache 2.0 | 0 | — | ✅ |
 | Argo CD | GitOps | Apache 2.0 | ~500 MiB–1 GiB | Flux | ❌ |
@@ -434,7 +420,6 @@ ZAP baseline, Cosign.
 
 ## References
 
-- [OpenTofu](https://opentofu.org/) · [Terraform license](https://www.hashicorp.com/license-faq)
 - [Pulumi](https://www.pulumi.com/docs/) · [Crossplane](https://crossplane.io/)
 - [Argo CD](https://argo-cd.readthedocs.io/) · [Argo Rollouts](https://argoproj.github.io/rollouts/)
 - [Cilium](https://cilium.io/) · [Istio ambient](https://istio.io/latest/docs/ambient/)

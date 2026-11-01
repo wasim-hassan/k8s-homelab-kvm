@@ -5,7 +5,7 @@
 # (see ADR-0005).
 #
 # Addresses are static DHCP reservations pinned by MAC in
-# terraform/libvirt-k8s-net.xml, so these are stable across VM restarts.
+# libvirt/k8s-net.xml, so these are stable across VM restarts.
 # Do not replace them with the dynamic-pool addresses you may see in `vm`.
 
 all:

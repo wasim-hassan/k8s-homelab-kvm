@@ -35,10 +35,10 @@ complete_msg() { printf '\n\033[32m%s\033[0m\n' "$1"; }
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NET_NAME="k8s"
-NET_XML="$REPO_DIR/terraform/libvirt-k8s-net.xml"
+NET_XML="$REPO_DIR/libvirt/k8s-net.xml"
 NODES=(k8s-cp-01 k8s-worker-01)
 
-# IP assignments must mirror terraform/libvirt-k8s-net.xml
+# IP assignments must mirror libvirt/k8s-net.xml
 declare -A EXPECTED_IP=(
   [k8s-cp-01]="192.168.123.11"
   [k8s-worker-01]="192.168.123.12"
@@ -111,8 +111,8 @@ if virsh net-info "$NET_NAME" >/dev/null 2>&1; then
   elif [[ "$hosts_total" -gt 0 ]]; then
     error "$((hosts_total - hosts_mac)) of $hosts_total DHCP reservation(s) missing mac=
      → libvirt silently drops a 'macaddr=' attribute. Must be 'mac='.
-       Fix terraform/$NET_NAME-net.xml, then:
-         virsh net-define terraform/$NET_NAME-net.xml
+       Fix $NET_XML, then:
+         virsh net-define $NET_XML
          virsh net-destroy $NET_NAME && virsh net-start $NET_NAME"
   else
     warn "no DHCP reservations found — node IPs will change on reboot"

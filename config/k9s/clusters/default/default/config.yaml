@@ -5,6 +5,7 @@ k9s:
     active: all
     lockFavorites: false
     favorites:
+      - envoy-gateway-system
       - podinfo
       - kube-public
       - default
